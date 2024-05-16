@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- Meta, title, CSS, favicons, etc. -->
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Debtors Accounting System</title>
+
+<!-- Bootstrap -->
+<link href="cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
+<link href="vendors/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- Font Awesome -->
+<link href="vendors/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+<!-- NProgress -->
+<link href="vendors/nprogress/nprogress.css" rel="stylesheet">
+<!-- iCheck -->
+<link href="vendors/iCheck/skins/flat/green.css" rel="stylesheet">
+<!-- Datatables -->
+
+<link href="vendors/datatables.net-bs/css/dataTables.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-buttons-bs/css/buttons.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-fixedheader-bs/css/fixedHeader.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-responsive-bs/css/responsive.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-scroller-bs/css/scroller.bootstrap.min.css" rel="stylesheet">
+
+<!-- Custom Theme Style -->
+<link href="build/css/custom.min.css" rel="stylesheet">
+
+<!-- JQUERY -->
+<link rel='stylesheet' href='js/jquery-ui-1.13.2/jquery-ui.css'>
+<script src='js/jquery/jquery-3.7.1.min.js'></script>
+<script src='js/jquery-ui-1.13.2/jquery-ui.js'></script>
+<script src='js/jquery-validation-1.19.5/jquery.validate.min.js'></script>
+
+<!-- Toaster -->
+<link rel='stylesheet' href='js/toastr-master/build/toastr.min.css'>
+<script src='js/toastr-master/build/toastr.min.js'></script>
+
+<style>
+
+</style>
+
+<script>
+
+let isEdit = false;
+
+class CustomerDataModel {
+
+constructor() {
+this.customers = [];
+this.customerDetail = null;
+this.states = [];
+}
+
+getCustomers() {
+return this.customers;
+}
+
+getCustomerDetails() {
+return this.customerDetail;
+}
+
+getStates() {
+return this.states;
+}
+
+}
+
+var model = new CustomerDataModel();
+
+function getCustomers() {
+
+return new Promise((resolve, reject) => {
+fetch('/getCustomers')
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch customers list, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+function getCustomerDetail(code) {
+
+return new Promise((resolve, reject) => {
+fetch('/getCustomerByCode?code='+code)
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch customer details, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+});
+
+}
+
+function removeCustomer(code) {
+
+return new Promise((resolve, reject) => {
+fetch('/removeCustomer?code='+code)
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to remove customer, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+const getStates = () => {
+
+return new Promise((resolve, reject) => {
+fetch('getStates')
+.then(res => {
+if(!res.ok) {
+throw Error('Unable to fetch states, please try again.');
+}
+return res.json();
+})
+.then(states => resolve(states))
+.catch(err => reject(err.message));
+});
+
+}
+
+const updateStatesOptionView = () => {
+let selectEle = $('#state_code');
+let optionEle;
+if(model.states.length > 0) {
+model.states.forEach((state) => {
+
+if(model.customerDetail.state_code == state.code) {
+optionEle = $(`<option id='${state.code}' selected value='${state.code}'>${state.name}</option>`);
+}
+else {
+optionEle = $(`<option id='${state.code}' value='${state.code}'>${state.name}</option>`);
+}
+
+selectEle.append(optionEle);
+});
+}
+
+}
+
+function viewCustomerDetail(tableRow) {
+const customerCode = tableRow.id;
+const customer = model.customers.find(customer => customer.code == customerCode);
+if(customer?.customerDetail) {
+model.customerDetail = customer.customerDetail;
+updateCustomerDetailView();
+}
+else {
+getCustomerDetail(customerCode).then(
+(data) => {
+customer.customerDetail = data.data;
+model.customerDetail = data.data;
+updateCustomerDetailView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+)
+}
+}
+
+const onDelete = () => {
+
+const index = model.customers.findIndex(customer => customer.code == model.customerDetail.code);
+
+//delete api integration
+
+removeCustomer(model.customerDetail.code).then(
+(res) => {
+if(res.success) {
+toastr.success('customer removed', '', { 
+positionClass: 'toast-top-center'
+});
+model.customers.splice(index, 1);
+updateCustomerView();
+model.customerDetail = null;
+updateCustomerDetailView();
+$('#deleteCustomerBox').dialog('close');
+}
+else {
+toastr.error('Unable to remove customer', '', { 
+positionClass: 'toast-top-center'
+});
+}
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+}
+
+function deleteCustomer(tableRow) {
+const customerCode = tableRow.parentElement.parentElement.id;
+const customer = model.customers.find(customer => customer.code == customerCode);
+
+$('#deleteCustomerBox').dialog({
+
+title: "Delete Customer",
+buttons: [
+{
+"text": "Delete",
+"click": onDelete
+},
+{
+"text": "Cancel",
+"click": function() {
+$(this).dialog('close');
+}
+}
+],
+"close": function() {
+clearAddCustomerForm();
+},
+minHeight: 250,
+minWidth: 400,
+modal: true
+});
+
+if(customer?.customerDetail) {
+model.customerDetail = customer.customerDetail;
+updateDeletingCustomerDetailView();
+}
+else {
+getCustomerDetail(customerCode).then(
+(data) => {
+customer.customerDetail = data.data;
+model.customerDetail = data.data;
+updateDeletingCustomerDetailView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+)
+}
+
+}
+
+const editCustomer = (tableRow) => {
+
+$('#customerFormBox').dialog({
+
+title: "Update Customer",
+buttons: [
+{
+"text": "Update",
+"click": onUpdate
+},
+{
+"text": "Cancel",
+"click": function() {
+$(this).dialog('close');
+clearAddCustomerForm();
+}
+}
+],
+"close": function() {
+clearAddCustomerForm();
+},
+minHeight: 400,
+minWidth: 400,
+modal: true
+});
+
+$('#opening_balance_field').hide();
+$('#opening_balance_type_field').hide();
+
+const customerCode = tableRow.parentElement.parentElement.id;
+const customer = model.customers.find(customer => customer.code == customerCode);
+
+if(customer?.customerDetail) {
+model.customerDetail = customer.customerDetail;
+updateCustomerFormView();
+updateStatesOptionView();
+}
+else {
+getCustomerDetail(customerCode).then(
+(data) => {
+customer.customerDetail = data.data;
+model.customerDetail = data.data;
+updateCustomerFormView();
+updateStatesOptionView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+)
+}
+
+}
+
+const updateCustomerFormView = () => {
+
+let customerForm = $('#customerForm')[0];
+if(model.customerDetail) {
+
+customerForm.code.value = model.customerDetail.code || 1;
+customerForm.name.value = model.customerDetail.name || '';
+customerForm.address.value = model.customerDetail.address || '';
+customerForm.reg_title_1.value = model.customerDetail.reg_title_1 || '';
+customerForm.reg_value_1.value = model.customerDetail.reg_value_1 || '';
+customerForm.reg_title_2.value = model.customerDetail.reg_title_2 || '';
+customerForm.reg_value_2.value = model.customerDetail.reg_value_2 || '';
+customerForm.reg_title_3.value = model.customerDetail.reg_title_3 || '';
+customerForm.reg_value_3.value = model.customerDetail.reg_value_3 || '';
+customerForm.contact_1.value = model.customerDetail.contact_1 || '';
+customerForm.contact_2.value = model.customerDetail.contact_2 || '';
+customerForm.contact_3.value = model.customerDetail.contact_3 || '';
+customerForm.state_code.value = model.customerDetail.state_code;
+}
+
+}
+
+function updateCustomerView() {
+var tbody = $('#customers-table > tbody');
+tbody.html('');
+var row;
+var cell;
+if (model.customers.length > 0) {
+var i = 0;
+var customer;
+while (i < model.customers.length) {
+customer = model.customers[i];
+row = $(`<tr onclick="viewCustomerDetail(this)" id=${customer.code}>`);
+cell = $(`<td>${i + 1}</td>`);
+row.append(cell);
+cell = $(`<td>${customer.code}</td>`);
+row.append(cell);
+cell = $(`<td>${customer.name}</td>`);
+row.append(cell);
+cell = $(`<td>${customer.address}</td>`);
+row.append(cell);
+cell = $('<div><i onclick="editCustomer(this)" class="fa fa-pencil-square-o fa-2x"></i>&nbsp;&nbsp;<i  onclick="deleteCustomer(this)" class="fa fa-trash fa-2x"></i></div>');
+row.append(cell);
+tbody.append(row);
+i++;
+}
+}
+else {
+row = $('<tr>');
+cell = $('<td colSpan="5" align="center">NO CUSTOMERS FOUND</td>');
+row.append(cell);
+tbody.append(row);
+}
+}
+
+function updateDeletingCustomerDetailView() {
+
+var deleteCustomerBox = $('#deleteCustomerBox');
+deleteCustomerBox.html('');
+var box;
+var content;
+if(model.customerDetail) {
+Object.keys(model.customerDetail).forEach((key) => {
+box = $('<div>');
+if(key == 'state_code') {
+const state = model.states.find(state => state.code == model.customerDetail.state_code);
+content = $(`<b style='text-transform: uppercase;'>State:</b>&nbsp;<span>${state.name}</span>`)
+}
+else {
+content = $(`<b style='text-transform: uppercase;'>${key}:</b>&nbsp;<span>${model.customerDetail[key]}</span>`)
+}
+box.append(content);
+deleteCustomerBox.append(box);
+});
+
+}
+else {
+
+}
+
+}
+
+function updateCustomerDetailView() {
+
+var tbody = $('#customer-detail > tbody');
+tbody.html('');
+var row;
+var col;
+if(model.customerDetail) {
+Object.keys(model.customerDetail).forEach((key) => {
+row = $('<tr>');
+if(key == 'state_code') {
+col = $(`<th style='text-transform: uppercase;'>State</th>`);
+row.append(col);
+const state = model.states.find(state => state.code == model.customerDetail.state_code);
+col = $(`<td>${state?.name}</td>`);
+} else {
+col = $(`<th style='text-transform: uppercase;'>${key}</th>`);
+row.append(col);
+col = $(`<td>${model.customerDetail[key]}</td>`);
+}
+row.append(col);
+tbody.append(row);
+});
+
+}
+else {
+
+}
+
+}
+
+function addNewCustomer() {
+
+model.customerDetail = {};
+$('#customerFormBox').dialog({
+
+title: "Add New Customer",
+buttons: [
+{
+"text": "Add",
+"click": onSubmit
+},
+{
+"text": "Cancel",
+"click": function() {
+$(this).dialog('close');
+clearAddCustomerForm();
+}
+}
+],
+"close": function() {
+clearAddCustomerForm();
+},
+minHeight: 400,
+minWidth: 400,
+modal: true
+});
+
+$('#opening_balance_field').show();
+$('#opening_balance_type_field').show();
+
+updateStatesOptionView();
+
+}
+
+function onSubmit() {
+
+//validation
+const validator = $('#customerForm').validate({
+"rules": {
+"name": {
+"required": true,
+"rangelength": [1, 150]
+},
+"address": {
+"required": true,
+"rangelength": [1, 500]
+},
+"reg_title_1": {
+"rangelength": [1, 50]
+},
+"reg_value_1": {
+"rangelength": [1, 50]
+},
+"reg_title_2": {
+"rangelength": [1, 50]
+},
+"reg_value_2": {
+"rangelength": [1, 50]
+},
+"reg_title_3": {
+"rangelength": [1, 50]
+},
+"reg_value_3": {
+"rangelength": [1, 50]
+},
+"contact_1": {
+"rangelength": [1, 20]
+},
+"contact_2": {
+"rangelength": [1, 20]
+},
+"contact_3": {
+"rangelength": [1, 20]
+},
+"state_code": {
+"required": true,
+"number": true
+},
+"opening_balance": {
+"number": true
+}
+},
+"messages": {
+"name": {
+"required": "Name is required",
+"rangelength": "Cannot exceeds 150 characters"
+},
+"address": {
+"required": "Address is required",
+"rangelength": "Cannot exceeds 500 characters"
+},
+"reg_title_1": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_value_1": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_title_2": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_value_2": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_title_3": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_value_3": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"contact_1": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"contact_2": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"contact_3": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"state_code": {
+"required": "State is required",
+"number": "Should be a numeric value"
+},
+"opening_balance": {
+"number": "Should be a numeric value"
+}
+}
+});
+
+validator.form();
+if(validator.valid()) {
+
+var customerForm = new FormData(document.getElementById('customerForm'));
+var customerJson = Object.fromEntries(customerForm.entries());
+
+var xhr = new XMLHttpRequest();
+xhr.onreadystatechange = () => {
+if(xhr.readyState == 4) {
+const response = JSON.parse(xhr.responseText);
+if(xhr.status == 200) {
+if(response.success) {
+const { code, name, address, reg_title_1, reg_value_1, reg_title_2, reg_value_2, reg_title_3, reg_value_3, contact_1, contact_2, contact_3, state_code } = response.data;
+model.customers.push({ 
+"code": code, "name": name, "address": address, 
+"reg_title_1": reg_title_1, "reg_value_1": reg_value_1, 
+"reg_title_2": reg_title_2, "reg_value_2": reg_value_2, 
+"reg_title_3": reg_title_3, "reg_value_3": reg_value_3,
+"contact_1": contact_1, "contact_2": contact_2, "contact_3": contact_3,
+"state_code": state_code
+});
+updateCustomerView();
+toastr.success('Customer Added', '', { 
+positionClass: 'toast-top-center'
+});
+$('#customerFormBox').dialog('close');
+}
+else {
+toastr.error(response.error, '', { 
+positionClass: 'toast-top-center'
+});
+}
+}
+}
+}
+xhr.open('POST', 'addCustomer', true);
+xhr.setRequestHeader('Content-type', 'application/json');
+xhr.send(JSON.stringify(customerJson));
+
+}
+}
+
+function onUpdate() {
+
+//validation
+const validator = $('#customerForm').validate({
+"rules": {
+"name": {
+"required": true,
+"rangelength": [1, 150]
+},
+"address": {
+"required": true,
+"rangelength": [1, 500]
+},
+"reg_title_1": {
+"rangelength": [1, 50]
+},
+"reg_value_1": {
+"rangelength": [1, 50]
+},
+"reg_title_2": {
+"rangelength": [1, 50]
+},
+"reg_value_2": {
+"rangelength": [1, 50]
+},
+"reg_title_3": {
+"rangelength": [1, 50]
+},
+"reg_value_3": {
+"rangelength": [1, 50]
+},
+"contact_1": {
+"rangelength": [1, 20]
+},
+"contact_2": {
+"rangelength": [1, 20]
+},
+"contact_3": {
+"rangelength": [1, 20]
+},
+"state_code": {
+"required": true,
+"number": true
+},
+},
+"messages": {
+"name": {
+"required": "Name is required",
+"rangelength": "Cannot exceeds 150 characters"
+},
+"address": {
+"required": "Address is required",
+"rangelength": "Cannot exceeds 500 characters"
+},
+"reg_title_1": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_value_1": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_title_2": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_value_2": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_title_3": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_value_3": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"contact_1": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"contact_2": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"contact_3": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"state_code": {
+"required": "State is required",
+"number": "Should be a numeric value"
+},
+}
+});
+
+validator.form();
+if(validator.valid()) {
+
+var customerForm = new FormData(document.getElementById('customerForm'));
+var customerJson = Object.fromEntries(customerForm.entries());
+
+var xhr = new XMLHttpRequest();
+xhr.onreadystatechange = () => {
+if(xhr.readyState == 4) {
+const response = JSON.parse(xhr.responseText);
+if(xhr.status == 200) {
+if(response.success) {
+const { code, name, address, reg_title_1, reg_value_1, reg_title_2, reg_value_2, reg_title_3, reg_value_3, contact_1, contact_2, contact_3, state_code } = response.data;
+const customer = model.customers.find(c => c.code == response.data.code);
+customer.name = name;
+customer.address = address;
+customer.reg_title_1 = reg_title_1;
+customer.reg_value_1 = reg_value_1;
+customer.reg_title_2 = reg_title_2;
+customer.reg_value_2 = reg_value_2;
+customer.reg_title_3 = reg_title_3;
+customer.reg_value_3 = reg_value_3;
+customer.contact_1 = contact_1;
+customer.contact_2 = contact_2;
+customer.contact_3 = contact_3;
+customer.state_code = state_code;
+delete customer.customerDetail;
+model.customerDetail = null;
+updateCustomerView();
+updateCustomerDetailView();
+toastr.success('Customer Updated', '', { 
+positionClass: 'toast-top-center'
+});
+$('#customerFormBox').dialog('close');
+}
+else {
+toastr.error(response.error, '', { 
+positionClass: 'toast-top-center'
+});
+}
+}
+}
+}
+xhr.open('POST', 'updateCustomer', true);
+xhr.setRequestHeader('Content-type', 'application/json');
+xhr.send(JSON.stringify(customerJson));
+
+}
+}
+
+function clearAddCustomerForm() {
+document.getElementById("name").value = "";
+document.getElementById("address").value = "";
+document.getElementById("reg_title_1").value = "";
+document.getElementById("reg_value_1").value = "";
+document.getElementById("reg_title_2").value = "";
+document.getElementById("reg_value_2").value = "";
+document.getElementById("reg_title_3").value = "";
+document.getElementById("reg_value_3").value = "";
+document.getElementById("contact_1").value = "";
+document.getElementById("contact_2").value = "";
+document.getElementById("contact_3").value = "";
+document.getElementById("state_code").value = "";
+document.getElementById("opening_balance").value = "";
+document.getElementById("opening_balance_type").value = "";
+}
+
+$(() => {
+
+getStates().then(
+(data) => {
+model.states = data.data;
+
+getCustomers().then(
+(data) => {
+model.customers = data.data;
+updateCustomerView();
+
+if(model.customers.length > 0) {
+getCustomerDetail(model.customers[0].code).then(
+(data) => {
+model.customers[0].customerDetail = data.data;
+model.customerDetail = data.data;
+updateCustomerDetailView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+)
+}
+
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+$('#customerFormBox').hide();
+$('#deleteCustomerBox').hide();
+
+});
+
+</script>
+
+</head>
+
+<body class="nav-md">
+<div class="container body">
+<div class="main_container">
+<div class="col-md-3 left_col">
+<div class="left_col scroll-view">
+<div class="navbar nav_title" style="border: 0;">
+<a href="index.html" class="site_title"><i class="fa fa-paw"></i> <span>DAS!</span></a>
+</div>
+
+<div class="clearfix"></div>
+
+<!-- menu profile quick info -->
+<div class="profile clearfix">
+<div class="profile_pic">
+<img src="images/img.jpg" alt="..." class="img-circle profile_img">
+</div>
+<div class="profile_info">
+<span>Welcome,</span>
+<h2>John Doe</h2>
+</div>
+</div>
+<!-- /menu profile quick info -->
+
+<br />
+
+<!-- sidebar menu -->
+<div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
+<div class="menu_section">
+<ul class="nav side-menu">
+<li><a href='items.html'><i class="fa fa-list"></i> Items </span></a></li>
+<li><a href='customers.html'><i class="fa fa-users"></i> Customers </span></a></li>
+<li><a href='creditInvoiceAddForm.html'><i class="fa fa-file-o"></i> Create Invoice </span></a></li>
+<li><a href='report.html'><i class="fa fa-list-alt"></i> Report </span></a></li>
+<li><a href='receipts.html'><i class="fa fa-clipboard"></i> Receipts </span></a></li>
+<li><a href='outstandingReport.html'><i class="fa fa-balance-scale"></i> Balance Report </span></a></li>
+<li><a href='traderSettings.html'><i class="fa fa-cog"></i> Setting </span></a></li>
+</ul>
+</div>
+</div>
+<!-- /sidebar menu -->
+
+</div>
+</div>
+
+<!-- top navigation -->
+<div class="top_nav">
+<div class="nav_menu">
+<div class="nav toggle">
+<a id="menu_toggle"><i class="fa fa-bars"></i></a>
+</div>
+<nav class="nav navbar-nav">
+<ul class=" navbar-right">
+<li class="nav-item dropdown open" style="padding-left: 15px;">
+<a href="javascript:;" class="user-profile dropdown-toggle" aria-haspopup="true" id="navbarDropdown"
+data-toggle="dropdown" aria-expanded="false">
+<img src="images/img.jpg" alt="">John Doe
+</a>
+<div class="dropdown-menu dropdown-usermenu pull-right" aria-labelledby="navbarDropdown">
+<a class="dropdown-item" href="javascript:;"> Profile</a>
+<a class="dropdown-item" href="javascript:;">
+<span class="badge bg-red pull-right">50%</span>
+<span>Settings</span>
+</a>
+<a class="dropdown-item" href="javascript:;">Help</a>
+<a class="dropdown-item" href="login.html"><i class="fa fa-sign-out pull-right"></i> Log Out</a>
+</div>
+</li>
+
+<li role="presentation" class="nav-item dropdown open">
+<a href="javascript:;" class="dropdown-toggle info-number" id="navbarDropdown1" data-toggle="dropdown"
+aria-expanded="false">
+<i class="fa fa-envelope-o"></i>
+<span class="badge bg-green">6</span>
+</a>
+<ul class="dropdown-menu list-unstyled msg_list" role="menu" aria-labelledby="navbarDropdown1">
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<div class="text-center">
+<a class="dropdown-item">
+  <strong>See All Alerts</strong>
+  <i class="fa fa-angle-right"></i>
+</a>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+<!-- /top navigation -->
+
+<!-- page content -->
+<div class="right_col" role="main">
+<div class="">
+<div class="page-title">
+<!-- <div class="title_left">
+<h3>Users <small>Some examples to get you started</small></h3>
+</div>
+
+<div class="title_right">
+<div class="col-md-5 col-sm-5 col-xs-12 form-group pull-right top_search">
+<div class="input-group">
+<input type="text" class="form-control" placeholder="Search for...">
+<span class="input-group-btn">
+<button class="btn btn-secondary" type="button">Go!</button>
+</span>
+</div>
+</div>
+</div> -->
+</div>
+
+<div class="clearfix"></div>
+
+<div class="row">
+<div class="col-md-12 col-sm-12 ">
+<div class="x_title">
+<h2>CUSTOMERS</h2>
+<ul class="nav navbar-right panel_toolbox">
+<li onclick="addNewCustomer()"><i class="fa fa-plus-circle fa-2x"></i></li>
+</ul>
+<div class="clearfix"></div>
+</div>
+<div class="x_content">
+<div class="row">
+<div class="col-sm-12">
+<div class="card-box table-responsive">
+  <!-- id="datatable-keytable" -->
+<table id="customers-table" class="table table-striped table-bordered" style="width:100%">
+<thead>
+<tr>
+<th>S.NO</th>
+<th>Code</th>
+<th>Name</th>
+<th>Address</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="col-md-12 col-sm-12 ">
+<div class="x_panel">
+<div class="x_title">
+<h2>CUSTOMER DETAILS</h2>
+<div class="clearfix"></div>
+</div>
+<div class="x_content">
+<div class="row">
+<div class="col-sm-12">
+<div class="card-box">
+<table id='customer-detail' class="table" style="width:30%">
+<tbody></tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id='customerFormBox'>
+
+<form id='customerForm'>
+
+<input type='hidden' value='' id='code' name='code' />
+
+<div>
+<label for='name'>Name</label>
+<input type='text' value='' id='name' name='name' />
+</div>
+
+<div>
+<label for='address'>Address</label>
+<input type='text' value='' id='address' name='address' />
+</div>
+
+<div>
+<label for='reg_title_1'>Document Title 1</label>
+<input type='text' value='' id='reg_title_1' name='reg_title_1' />
+</div>
+
+<div>
+<label for='reg_value_1'>Document Value 1</label>
+<input type='text' value='' id='reg_value_1' name='reg_value_1' />
+</div>
+
+<div>
+<label for='reg_title_2'>Document Title 2</label>
+<input type='text' value='' id='reg_title_2' name='reg_title_2' />
+</div>
+
+<div>
+<label for='reg_value_2'>Document Value 2</label>
+<input type='text' value='' id='reg_value_2' name='reg_value_2' />
+</div>
+
+<div>
+<label for='reg_title_3'>Document Title 3</label>
+<input type='text' value='' id='reg_title_3' name='reg_title_3' />
+</div>
+
+<div>
+<label for='reg_value_3'>Document Value 3</label>
+<input type='text' value='' id='reg_value_3' name='reg_value_3' />
+</div>
+
+<div>
+<label for='contact_1'>Contact 1</label>
+<input type='text' value='' id='contact_1' name='contact_1' />
+</div>
+
+<div>
+<label for='contact_2'>Contact 2</label>
+<input type='text' value='' id='contact_2' name='contact_2' />
+</div>
+
+<div>
+<label for='contact_3'>Contact 3</label>
+<input type='text' value='' id='contact_3' name='contact_3' />
+</div> 
+
+<div>
+<label for='state_code'>State</label>
+<select id='state_code' name='state_code'>
+</select>
+</div>
+
+<div id='opening_balance_field'>
+<label for='opening_balance'>Opening Balance</label>
+<input type='text' value='' id='opening_balance' name='opening_balance' />
+</div>
+
+<div id='opening_balance_type_field'>
+<label for='opening_balance_type'>State</label>
+<select id='opening_balance_type' name='opening_balance_type'>
+<option value=''>--Select Type--</option>
+<option value='CR'>Credit</option>
+<option value='DR'>Debit</option>
+</select>
+</div>
+
+</form>
+
+</div>
+
+<div id='deleteCustomerBox'>
+
+</div>
+
+</div>
+<!-- page content -->
+
+<!-- footer content -->
+<footer>
+<div class="pull-right">
+Gentelella - Bootstrap Admin Template by <a href="https://colorlib.com">Colorlib</a>
+</div>
+<div class="clearfix"></div>
+</footer>
+<!-- /footer content -->
+</div>
+</div>
+
+</body>
+
+</html>

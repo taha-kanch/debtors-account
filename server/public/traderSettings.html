@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- Meta, title, CSS, favicons, etc. -->
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Debtors Accounting System</title>
+
+<!-- Bootstrap -->
+<link href="cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
+<link href="vendors/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- Font Awesome -->
+<link href="vendors/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+<!-- NProgress -->
+<link href="vendors/nprogress/nprogress.css" rel="stylesheet">
+<!-- iCheck -->
+<link href="vendors/iCheck/skins/flat/green.css" rel="stylesheet">
+<!-- Datatables -->
+
+<link href="vendors/datatables.net-bs/css/dataTables.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-buttons-bs/css/buttons.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-fixedheader-bs/css/fixedHeader.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-responsive-bs/css/responsive.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-scroller-bs/css/scroller.bootstrap.min.css" rel="stylesheet">
+
+<!-- Custom Theme Style -->
+<link href="build/css/custom.min.css" rel="stylesheet">
+
+<!-- JQUERY -->
+<link rel='stylesheet' href='js/jquery-ui-1.13.2/jquery-ui.css'>
+<script src='js/jquery/jquery-3.7.1.min.js'></script>
+<script src='js/jquery-ui-1.13.2/jquery-ui.js'></script>
+<script src='js/jquery-validation-1.19.5/jquery.validate.min.js'></script>
+
+<!-- Toaster -->
+<link rel='stylesheet' href='js/toastr-master/build/toastr.min.css'>
+<script src='js/toastr-master/build/toastr.min.js'></script>
+
+<style>
+
+</style>
+
+<script>
+
+class TraderDataModel {
+
+constructor() {
+this.states = [];
+this.trader = {};
+}
+
+getStates() {
+return this.states;
+}
+
+getTrader() {
+return this.trader;
+}
+
+}
+
+var model = new TraderDataModel();
+
+const getTrader = () => {
+
+return new Promise((resolve, reject) => {
+fetch('/getTrader')
+.then(res => {
+if(!res.ok) {
+throw Error('Unable to fetch trader, please try again.');
+}
+return res.json();
+})
+.then(trader => resolve(trader))
+.catch(err => reject(err.message));
+});
+
+}
+
+const getStates = () => {
+
+return new Promise((resolve, reject) => {
+fetch('getStates')
+.then(res => {
+if(!res.ok) {
+throw Error('Unable to fetch states, please try again.');
+}
+return res.json();
+})
+.then(states => resolve(states))
+.catch(err => reject(err.message));
+});
+
+}
+
+const updateStatesOptionView = () => {
+
+let selectEle = $('#state_code');
+let optionEle;
+if(model.states.length > 0) {
+model.states.forEach((state) => {
+
+if(model.trader.state_code == state.code) {
+optionEle = $(`<option id='${state.code}' selected value='${state.code}'>${state.name}</option>`);
+}
+else {
+optionEle = $(`<option id='${state.code}' value='${state.code}'>${state.name}</option>`);
+}
+
+selectEle.append(optionEle);
+});
+}
+
+}
+
+const updateTraderFormView = () => {
+
+let traderForm = $('#traderForm')[0];
+if(model.trader) {
+
+traderForm.code.value = model.trader.code || 1;
+traderForm.name.value = model.trader.name || '';
+traderForm.address.value = model.trader.address || '';
+traderForm.gst_num.value = model.trader.gst_num || '';
+traderForm.reg_title_1.value = model.trader.reg_title_1 || '';
+traderForm.reg_value_1.value = model.trader.reg_value_1 || '';
+traderForm.reg_title_2.value = model.trader.reg_title_2 || '';
+traderForm.reg_value_2.value = model.trader.reg_value_2 || '';
+traderForm.reg_title_3.value = model.trader.reg_title_3 || '';
+traderForm.reg_value_3.value = model.trader.reg_value_3 || '';
+traderForm.contact_1.value = model.trader.contact_1 || '';
+traderForm.contact_2.value = model.trader.contact_2 || '';
+traderForm.contact_3.value = model.trader.contact_3 || '';
+traderForm.state_code.value = model.trader.state_code || model.states[0].code;
+traderForm.bank_account_name.value = model.trader.bank_account_name || '';
+traderForm.bank_account_num.value = model.trader.bank_account_num || '';
+traderForm.bank_account_branch_name.value = model.trader.bank_account_branch_name || '';
+traderForm.bank_account_ifsc.value = model.trader.bank_account_ifsc || '';
+}
+
+}
+
+const onSubmit = () => {
+
+//validation
+const validator = $('#traderForm').validate({
+"rules": {
+"name": {
+"required": true,
+"rangelength": [1, 150]
+},
+"address": {
+"required": true,
+"rangelength": [1, 500]
+},
+"gst_num": {
+"required": true,
+"rangelength": [1, 20]
+},
+"reg_title_1": {
+"rangelength": [1, 50]
+},
+"reg_value_1": {
+"rangelength": [1, 50]
+},
+"reg_title_2": {
+"rangelength": [1, 50]
+},
+"reg_value_2": {
+"rangelength": [1, 50]
+},
+"reg_title_3": {
+"rangelength": [1, 50]
+},
+"reg_value_3": {
+"rangelength": [1, 50]
+},
+"contact_1": {
+"rangelength": [1, 20]
+},
+"contact_2": {
+"rangelength": [1, 20]
+},
+"contact_3": {
+"rangelength": [1, 20]
+},
+"state_code": {
+"required": true,
+"number": true
+},
+"bank_account_name": {
+"required": true,
+"rangelength": [1, 150]
+},
+"bank_account_num": {
+"required": true,
+"number": true
+},
+"bank_account_branch_name": {
+"required": true,
+"rangelength": [1, 150]
+},
+"bank_account_ifsc": {
+"required": true,
+"rangelength": [1, 20]
+},
+},
+"messages": {
+"name": {
+"required": "Name is required",
+"rangelength": "Cannot exceeds 150 characters"
+},
+"address": {
+"required": "Address is required",
+"rangelength": "Cannot exceeds 500 characters"
+},
+"gst_num": {
+"required": "GST Number is required",
+"rangelength": "Cannot exceeds 20 characters"
+},
+"reg_title_1": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_value_1": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_title_2": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_value_2": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_title_3": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"reg_value_3": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"contact_1": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"contact_2": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"contact_3": {
+"rangelength": "Cannot exceeds 50 characters"
+},
+"state_code": {
+"required": "State is required",
+"number": "Should be a numeric value"
+},
+"bank_account_name": {
+"required": "Bank Name is required",
+"rangelength": "Cannot exceeds 150 characters"
+},
+"bank_account_num": {
+"required": "Account Number is required",
+"number": "Should be a numeric value"
+},
+"bank_account_branch_name": {
+"required": "Branch Name is required",
+"rangelength": "Cannot exceeds 150 characters"
+},
+"bank_account_ifsc": {
+"required": "IFSC is required",
+"rangelength": "Cannot exceeds 150 characters"
+},
+}
+});
+
+validator.form();
+if(validator.valid()) {
+
+var traderForm = new FormData(document.getElementById('traderForm'));
+var traderJson = Object.fromEntries(traderForm.entries());
+
+var xhr = new XMLHttpRequest();
+xhr.onreadystatechange = () => {
+if(xhr.readyState == 4) {
+const response = JSON.parse(xhr.responseText);
+if(xhr.status == 200) {
+if(response.success) {
+model.trader = response.data;
+updateTraderFormView();
+toastr.success('Trader Updated', '', { 
+positionClass: 'toast-top-center'
+});
+}
+else {
+toastr.error(response.error, '', { 
+positionClass: 'toast-top-center'
+});
+}
+}
+}
+}
+
+xhr.open('POST', 'updateTrader', true);
+xhr.setRequestHeader('Content-type', 'application/json');
+xhr.send(JSON.stringify(traderJson));
+
+}
+}
+
+$(() => {
+
+getTrader().then(
+(data) => {
+model.trader = data.data;
+
+getStates().then(
+(data) => {
+model.states = data.data;
+updateStatesOptionView();
+updateTraderFormView();
+},
+(err) => {
+toastr.error('err', '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+},
+(err) => {
+toastr.error('err', '', { 
+positionClass: 'toast-top-center'
+});
+}
+)
+
+})
+
+</script>
+
+</head>
+
+<body class="nav-md">
+<div class="container body">
+<div class="main_container">
+<div class="col-md-3 left_col">
+<div class="left_col scroll-view">
+<div class="navbar nav_title" style="border: 0;">
+<a href="index.html" class="site_title"><i class="fa fa-paw"></i> <span>DAS!</span></a>
+</div>
+
+<div class="clearfix"></div>
+
+<!-- menu profile quick info -->
+<div class="profile clearfix">
+<div class="profile_pic">
+<img src="images/img.jpg" alt="..." class="img-circle profile_img">
+</div>
+<div class="profile_info">
+<span>Welcome,</span>
+<h2>John Doe</h2>
+</div>
+</div>
+<!-- /menu profile quick info -->
+
+<br />
+
+<!-- sidebar menu -->
+<div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
+<div class="menu_section">
+<ul class="nav side-menu">
+<li><a href='items.html'><i class="fa fa-list"></i> Items </span></a></li>
+<li><a href='customers.html'><i class="fa fa-users"></i> Customers </span></a></li>
+<li><a href='creditInvoiceAddForm.html'><i class="fa fa-file-o"></i> Create Invoice </span></a></li>
+<li><a href='report.html'><i class="fa fa-list-alt"></i> Report </span></a></li>
+<li><a href='receipts.html'><i class="fa fa-clipboard"></i> Receipts </span></a></li>
+<li><a href='outstandingReport.html'><i class="fa fa-balance-scale"></i> Balance Report </span></a></li>
+<li><a href='traderSettings.html'><i class="fa fa-cog"></i> Setting </span></a></li>
+</ul>
+</div>
+</div>
+<!-- /sidebar menu -->
+
+</div>
+</div>
+
+<!-- top navigation -->
+<div class="top_nav">
+<div class="nav_menu">
+<div class="nav toggle">
+<a id="menu_toggle"><i class="fa fa-bars"></i></a>
+</div>
+<nav class="nav navbar-nav">
+<ul class=" navbar-right">
+<li class="nav-item dropdown open" style="padding-left: 15px;">
+<a href="javascript:;" class="user-profile dropdown-toggle" aria-haspopup="true" id="navbarDropdown"
+data-toggle="dropdown" aria-expanded="false">
+<img src="images/img.jpg" alt="">John Doe
+</a>
+<div class="dropdown-menu dropdown-usermenu pull-right" aria-labelledby="navbarDropdown">
+<a class="dropdown-item" href="javascript:;"> Profile</a>
+<a class="dropdown-item" href="javascript:;">
+<span class="badge bg-red pull-right">50%</span>
+<span>Settings</span>
+</a>
+<a class="dropdown-item" href="javascript:;">Help</a>
+<a class="dropdown-item" href="login.html"><i class="fa fa-sign-out pull-right"></i> Log Out</a>
+</div>
+</li>
+
+<li role="presentation" class="nav-item dropdown open">
+<a href="javascript:;" class="dropdown-toggle info-number" id="navbarDropdown1" data-toggle="dropdown"
+aria-expanded="false">
+<i class="fa fa-envelope-o"></i>
+<span class="badge bg-green">6</span>
+</a>
+<ul class="dropdown-menu list-unstyled msg_list" role="menu" aria-labelledby="navbarDropdown1">
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<div class="text-center">
+<a class="dropdown-item">
+  <strong>See All Alerts</strong>
+  <i class="fa fa-angle-right"></i>
+</a>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+<!-- /top navigation -->
+
+<!-- page content -->
+<div class="right_col" role="main">
+<div class="">
+<div class="page-title"></div>
+
+<div class="clearfix"></div>
+
+<div class="row">
+<div class="col-md-12 col-sm-12 ">
+<div class="x_title">
+<h2>Trader Info</h2>
+<div class="clearfix"></div>
+</div>
+<div class="x_content">
+<div class="row">
+<div class="col-sm-12">
+
+<form id='traderForm'>
+
+<input type='hidden' value='' id='code' name='code' />
+
+<div>
+<label for='name'>Name</label>
+<input type='text' value='' id='name' name='name' placeholder='enter name' />
+</div>
+
+<div>
+<label for='address'>Address</label>
+<input type='text' value='' id='address' name='address' placeholder='enter address' />
+</div>
+
+<div>
+<label for='gst_num'>GST Number</label>
+<input type='text' value='' id='gst_num' name='gst_num' placeholder='enter gst number' />
+</div>
+
+<div>
+<label for='reg_title_1'>Registration Title 1</label>
+<input type='text' value='' id='reg_title_1' name='reg_title_1' placeholder='enter registration title 1' />
+</div>
+
+<div>
+<label for='reg_value_1'>Registration Value 1</label>
+<input type='text' value='' id='reg_value_1' name='reg_value_1' placeholder='enter registration value 1' />
+</div>
+
+<div>
+<label for='reg_title_2'>Registration Title 2</label>
+<input type='text' value='' id='reg_title_2' name='reg_title_2' placeholder='enter registration title 2' />
+</div>
+
+<div>
+<label for='reg_value_2'>Registration Value 2</label>
+<input type='text' value='' id='reg_value_2' name='reg_value_2' placeholder='enter registration value 2' />
+</div>
+
+<div>
+<label for='reg_title_3'>Registration Title 3</label>
+<input type='text' value='' id='reg_title_3' name='reg_title_3' placeholder='enter registration title 3' />
+</div>
+
+<div>
+<label for='reg_value_3'>Registration Value 3</label>
+<input type='text' value='' id='reg_value_3' name='reg_value_3' placeholder='enter registration value 3' />
+</div>
+
+<div>
+<label for='contact_1'>Contact 1</label>
+<input type='text' value='' id='contact_1' name='contact_1' placeholder='enter contact 1' />
+</div>
+
+<div>
+<label for='contact_2'>Contact 2</label>
+<input type='text' value='' id='contact_2' name='contact_2' placeholder='enter contact 2' />
+</div>
+
+<div>
+<label for='contact_3'>Contact 3</label>
+<input type='text' value='' id='contact_3' name='contact_3' placeholder='enter contact 3' />
+</div> 
+
+<div>
+<label for='state_code'>State</label>
+<select id='state_code' name='state_code'>
+</select>
+</div>
+
+<div>
+<label for='contact_3'>Bank name</label>
+<input type='text' value='' id='bank_account_name' name='bank_account_name' placeholder='enter bank name' />
+</div> 
+
+<div>
+<label for='contact_3'>Account Number</label>
+<input type='text' value='' id='bank_account_num' name='bank_account_num' placeholder='enter account number' />
+</div> 
+
+<div>
+<label for='contact_3'>Branch Name</label>
+<input type='text' value='' id='bank_account_branch_name' name='bank_account_branch_name' placeholder='enter branch name' />
+</div> 
+
+<div>
+<label for='contact_3'>IFSC Code</label>
+<input type='text' value='' id='bank_account_ifsc' name='bank_account_ifsc' placeholder='enter ifsc code' />
+</div> 
+
+<div>
+<button type='button' onClick='onSubmit()'>Update</button>
+</div>
+
+</form>
+
+
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<!-- /page content -->
+
+<!-- footer content -->
+<footer>
+<div class="pull-right">
+Gentelella - Bootstrap Admin Template by <a href="https://colorlib.com">Colorlib</a>
+</div>
+<div class="clearfix"></div>
+</footer>
+<!-- /footer content -->
+</div>
+</div>
+
+</body>
+
+</html>

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- Meta, title, CSS, favicons, etc. -->
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Debtors Accounting System</title>
+
+<!-- Bootstrap -->
+<link href="cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
+<link href="vendors/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- Font Awesome -->
+<link href="vendors/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+<!-- NProgress -->
+<link href="vendors/nprogress/nprogress.css" rel="stylesheet">
+<!-- iCheck -->
+<link href="vendors/iCheck/skins/flat/green.css" rel="stylesheet">
+<!-- Datatables -->
+
+<link href="vendors/datatables.net-bs/css/dataTables.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-buttons-bs/css/buttons.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-fixedheader-bs/css/fixedHeader.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-responsive-bs/css/responsive.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-scroller-bs/css/scroller.bootstrap.min.css" rel="stylesheet">
+
+<!-- Custom Theme Style -->
+<link href="build/css/custom.min.css" rel="stylesheet">
+
+<!-- JQUERY -->
+<link rel='stylesheet' href='js/jquery-ui-1.13.2/jquery-ui.css'>
+<script src='js/jquery/jquery-3.7.1.min.js'></script>
+<script src='js/jquery-ui-1.13.2/jquery-ui.js'></script>
+<script src='js/jquery-validation-1.19.5/jquery.validate.min.js'></script>
+
+<!-- Toaster -->
+<link rel='stylesheet' href='js/toastr-master/build/toastr.min.css'>
+<script src='js/toastr-master/build/toastr.min.js'></script>
+
+<style>
+
+</style>
+
+<script>
+
+class OutstandingReportDataModel {
+
+constructor() {
+this.customers = [];
+}
+
+}
+
+var model = new OutstandingReportDataModel();
+
+function getOutstandingReport() {
+
+return new Promise((resolve, reject) => {
+fetch('/getOutstandingReport')
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch outstanding report, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+//update view start
+
+function updateCustomerView() {
+var tbody = $('#outstanding-report-table > tbody');
+tbody.html('');
+var row;
+var cell;
+if (model.customers.length > 0) {
+var i = 0;
+var customer;
+while (i < model.customers.length) {
+customer = model.customers[i];
+row = $(`<tr id='${customer.code}'>`);
+cell = $(`<td>${i+1}</td>`);
+row.append(cell);
+cell = $(`<td>${customer.customer_name}</td>`);
+row.append(cell);
+if(customer.balance > 0) {
+cell = $(`<td>${customer.balance}</td>`);
+row.append(cell);
+cell = $(`<td>0</td>`);
+row.append(cell);
+}
+else {
+cell = $(`<td>0</td>`);
+row.append(cell);
+cell = $(`<td>${customer.balance * (-1)}</td>`);
+row.append(cell);
+}
+tbody.append(row);
+i++;
+}
+
+let DEBIT_TOTAL = 0;
+let CREDIT_TOTAL = 0; 
+model.customers.forEach(customer => {
+if(customer.balance > 0) {
+DEBIT_TOTAL += customer.balance;
+}
+else {
+CREDIT_TOTAL += (-customer.balance);
+}
+});
+
+row = $(`<tr>`);
+cell = $(`<td colSpan='2' align='center'><b>Total</b></td>`)
+row.append(cell);
+cell = $(`<td><b>${DEBIT_TOTAL}</b></td>`);
+row.append(cell);
+cell = $(`<td><b>${CREDIT_TOTAL}</b></td>`);
+row.append(cell);
+tbody.append(row);
+
+}
+else {
+row = $('<tr>');
+cell = $('<td colSpan="5" align="center">NO CUSTOMERS FOUND</td>');
+row.append(cell);
+tbody.append(row);
+}
+
+}
+
+//update view end
+
+$(() => {
+
+getOutstandingReport().then(
+(data) => {
+model.customers = data.data;
+updateCustomerView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+});
+
+</script>
+
+</head>
+
+<body class="nav-md">
+<div class="container body">
+<div class="main_container">
+<div class="col-md-3 left_col">
+<div class="left_col scroll-view">
+<div class="navbar nav_title" style="border: 0;">
+<a href="index.html" class="site_title"><i class="fa fa-paw"></i> <span>DAS!</span></a>
+</div>
+
+<div class="clearfix"></div>
+
+<!-- menu profile quick info -->
+<div class="profile clearfix">
+<div class="profile_pic">
+<img src="images/img.jpg" alt="..." class="img-circle profile_img">
+</div>
+<div class="profile_info">
+<span>Welcome,</span>
+<h2>John Doe</h2>
+</div>
+</div>
+<!-- /menu profile quick info -->
+
+<br />
+
+<!-- sidebar menu -->
+<div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
+<div class="menu_section">
+<ul class="nav side-menu">
+<li><a href='items.html'><i class="fa fa-list"></i> Items </span></a></li>
+<li><a href='customers.html'><i class="fa fa-users"></i> Customers </span></a></li>
+<li><a href='creditInvoiceAddForm.html'><i class="fa fa-file-o"></i> Create Invoice </span></a></li>
+<li><a href='report.html'><i class="fa fa-list-alt"></i> Report </span></a></li>
+<li><a href='receipts.html'><i class="fa fa-clipboard"></i> Receipts </span></a></li>
+<li><a href='outstandingReport.html'><i class="fa fa-balance-scale"></i> Balance Report </span></a></li>
+<li><a href='traderSettings.html'><i class="fa fa-cog"></i> Setting </span></a></li>
+</ul>
+</div>
+</div>
+<!-- /sidebar menu -->
+
+</div>
+</div>
+
+<!-- top navigation -->
+<div class="top_nav">
+<div class="nav_menu">
+<div class="nav toggle">
+<a id="menu_toggle"><i class="fa fa-bars"></i></a>
+</div>
+<nav class="nav navbar-nav">
+<ul class=" navbar-right">
+<li class="nav-item dropdown open" style="padding-left: 15px;">
+<a href="javascript:;" class="user-profile dropdown-toggle" aria-haspopup="true" id="navbarDropdown"
+data-toggle="dropdown" aria-expanded="false">
+<img src="images/img.jpg" alt="">John Doe
+</a>
+<div class="dropdown-menu dropdown-usermenu pull-right" aria-labelledby="navbarDropdown">
+<a class="dropdown-item" href="javascript:;"> Profile</a>
+<a class="dropdown-item" href="javascript:;">
+<span class="badge bg-red pull-right">50%</span>
+<span>Settings</span>
+</a>
+<a class="dropdown-item" href="javascript:;">Help</a>
+<a class="dropdown-item" href="login.html"><i class="fa fa-sign-out pull-right"></i> Log Out</a>
+</div>
+</li>
+
+<li role="presentation" class="nav-item dropdown open">
+<a href="javascript:;" class="dropdown-toggle info-number" id="navbarDropdown1" data-toggle="dropdown"
+aria-expanded="false">
+<i class="fa fa-envelope-o"></i>
+<span class="badge bg-green">6</span>
+</a>
+<ul class="dropdown-menu list-unstyled msg_list" role="menu" aria-labelledby="navbarDropdown1">
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<div class="text-center">
+<a class="dropdown-item">
+  <strong>See All Alerts</strong>
+  <i class="fa fa-angle-right"></i>
+</a>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+<!-- /top navigation -->
+
+<!-- page content -->
+<div class="right_col" role="main">
+<div class="">
+<div class="page-title">
+<!-- <div class="title_left">
+<h3>Users <small>Some examples to get you started</small></h3>
+</div>
+
+<div class="title_right">
+<div class="col-md-5 col-sm-5 col-xs-12 form-group pull-right top_search">
+<div class="input-group">
+<input type="text" class="form-control" placeholder="Search for...">
+<span class="input-group-btn">
+<button class="btn btn-secondary" type="button">Go!</button>
+</span>
+</div>
+</div>
+</div> -->
+</div>
+
+<div class="clearfix"></div>
+
+<div class="row">
+<div class="col-md-12 col-sm-12 ">
+<div class="x_title">
+<h2>OUTSTANDING REPORT</h2>
+<div class="clearfix"></div>
+</div>
+<div class="x_content">
+<div class="row">
+<div class="col-sm-12">
+<div class="card-box table-responsive">
+<table id="outstanding-report-table" class="table table-striped table-bordered" style="width:100%">
+<thead>
+<tr>
+<th>S.NO</th>
+<th>Customer</th>
+<th>DR Balance</th>
+<th>CR Balance</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<!-- page content -->
+
+<!-- footer content -->
+<footer>
+<div class="pull-right">
+Gentelella - Bootstrap Admin Template by <a href="https://colorlib.com">Colorlib</a>
+</div>
+<div class="clearfix"></div>
+</footer>
+<!-- /footer content -->
+</div>
+</div>
+
+</body>
+
+</html>

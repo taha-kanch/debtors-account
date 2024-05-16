@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- Meta, title, CSS, favicons, etc. -->
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Debtors Accounting System</title>
+
+<!-- Bootstrap -->
+<link href="cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
+<link href="vendors/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- Font Awesome -->
+<link href="vendors/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+<!-- NProgress -->
+<link href="vendors/nprogress/nprogress.css" rel="stylesheet">
+<!-- iCheck -->
+<link href="vendors/iCheck/skins/flat/green.css" rel="stylesheet">
+<!-- Datatables -->
+
+<link href="vendors/datatables.net-bs/css/dataTables.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-buttons-bs/css/buttons.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-fixedheader-bs/css/fixedHeader.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-responsive-bs/css/responsive.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-scroller-bs/css/scroller.bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" rel="stylesheet" type="text/css" />
+
+<!-- Custom Theme Style -->
+<link href="build/css/custom.min.css" rel="stylesheet">
+
+<!-- JQUERY -->
+<link rel='stylesheet' href='js/jquery-ui-1.13.2/jquery-ui.css'>
+<script src='js/jquery/jquery-3.7.1.min.js'></script>
+<script src='js/jquery-ui-1.13.2/jquery-ui.js'></script>
+<script src='js/jquery-validation-1.19.5/jquery.validate.min.js'></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+
+<!-- Toaster -->
+<link rel='stylesheet' href='js/toastr-master/build/toastr.min.css'>
+<script src='js/toastr-master/build/toastr.min.js'></script>
+
+<style>
+
+</style>
+
+<script>
+
+class ReportDataModel {
+
+constructor() {
+this.invoices = [];
+this.invoiceDetail = null;
+}
+
+}
+
+var model = new ReportDataModel();
+
+const getInvoices = (start_date='', end_date='') => {
+
+return new Promise((resolve, reject) => {
+fetch(`/getInvoices?start_date=${start_date}&end_date=${end_date}`)
+.then((res) => {
+if(!res.ok) {
+throw Error('Unable to fetch invoices, please try after some time');
+}
+return res.json();
+})
+.then(invoices => resolve(invoices))
+.catch(err => reject(err.message))
+});
+
+}
+
+const getInvoiceByCode = (code) => {
+
+return new Promise((resolve, reject) => {
+fetch(`/getInvoiceByCode?code=${code}`)
+.then((res) => {
+if(!res.ok) {
+throw Error('Unable to fetch invoice detail, please try after some time');
+}
+return res.json();
+})
+.then(invoice => resolve(invoice))
+.catch(err => reject(err.message))
+});
+
+}
+
+// update view start
+
+const updateInvoiceReportView = () => {
+
+var tbody = $('#invoices-table > tbody');
+tbody.html('');
+var row;
+var cell;
+if (model.invoices.length > 0) {
+var i = 0;
+var invoice;
+while (i < model.invoices.length) {
+invoice = model.invoices[i];
+row = $(`<tr id=${invoice.code}>`);
+cell = $(`<td>${invoice.code}</td>`);
+row.append(cell);
+
+const date = new Date(invoice.invoice_date);
+const day = date.getDate().toString().padStart(2, '0');
+const month = (date.getMonth() + 1).toString().padStart(2, '0');
+const year = date.getFullYear();
+const formattedDate = `${year}-${month}-${day}`;
+
+cell = $(`<td>${formattedDate}</td>`);
+row.append(cell);
+cell = $(`<td>${invoice.customer_name}</td>`);
+row.append(cell);
+cell = $(`<td>${invoice.taxable_amt}</td>`);
+row.append(cell);
+cell = $(`<td>${invoice.cgst_amt}</td>`);
+row.append(cell);
+cell = $(`<td>${invoice.sgst_amt}</td>`);
+row.append(cell);
+cell = $(`<td>${invoice.igst_amt}</td>`);
+row.append(cell);
+cell = $(`<td>${invoice.total_amt}</td>`);
+row.append(cell);
+cell = $('<div><i onclick="openFullInvoice(this)" class="fa fa-eye fa-2x"></i></div>');
+row.append(cell);
+tbody.append(row);
+i++;
+}
+}
+else {
+row = $('<tr>');
+cell = $('<td colSpan="9" align="center">NO INVOICE FOUND</td>');
+row.append(cell);
+tbody.append(row);
+}
+
+}
+
+const updateInvoiceView = () => {
+
+const date = new Date(model.invoiceDetail.invoice_date);
+const day = date.getDate().toString().padStart(2, '0');
+const month = (date.getMonth() + 1).toString().padStart(2, '0');
+const year = date.getFullYear();
+const formattedDate = `${day}/${month}/${year}`;
+
+$('#invoice-date').html(`Date: ${formattedDate}`);
+let invoiceCol = $('#invoice-col-heading');
+invoiceCol.html('');
+invoiceCol.append(`<b>Invoice #${model.invoiceDetail.code}</b>`);
+invoiceCol.append('<br>');
+invoiceCol.append(`<b>Customer Name: </b>${model.invoiceDetail.customer_name}`);
+invoiceCol.append('<br><br>');
+
+//display items start
+var item_tbody = $('#invoice-item');
+item_tbody.html('');
+let row,cell;
+
+var i = 0;
+if(model.invoiceDetail.items.length > 0) {
+let item;
+while(i < model.invoiceDetail.items.length) {
+item = model.invoiceDetail.items[i];
+row = $(`<tr>`);
+
+col = $(`<td>${item.item_name}</td>`);
+row.append(col);
+col = $(`<td>${item.price.toFixed(2)}</td>`);
+row.append(col);
+col = $(`<td>${item.qty}</td>`);
+row.append(col);
+col = $(`<td>${item.uom_name}</td>`);
+row.append(col);
+col = $(`<td>${item.taxable_amt.toFixed(2)}</td>`);
+row.append(col);
+col = $(`<td>${item.igst_amt.toFixed(2)}</td>`);
+row.append(col);
+col = $(`<td>${item.sgst_amt.toFixed(2)}</td>`);
+row.append(col);
+col = $(`<td>${item.cgst_amt.toFixed(2)}</td>`);
+row.append(col);
+col = $(`<td>${item.total_amt.toFixed(2)}</td>`);
+row.append(col);
+item_tbody.append(row);
+i++;
+}
+
+}
+else {
+row = $('<tr>');
+cell = $('<td colSpan="9" align="center"><b>NO ITEMS FOUND</b></td>');
+row.append(cell);
+item_tbody.append(row);
+}
+//display items end
+
+//display additional charges start
+var additional_charges_tbody = $('#invoice-additional-charges');
+additional_charges_tbody.html('');
+
+i = 0;
+if(model.invoiceDetail.additional_charges.length > 0) {
+let additional_charge;
+while(i < model.invoiceDetail.additional_charges.length) {
+additional_charge = model.invoiceDetail.additional_charges[i];
+row = $(`<tr>`);
+
+col = $(`<td>${additional_charge.description}</td>`);
+row.append(col);
+col = $(`<td>${additional_charge.taxable_amt.toFixed(2)}</td>`);
+row.append(col);
+col = $(`<td>${additional_charge.igst_amt.toFixed(2)}</td>`);
+row.append(col);
+col = $(`<td>${additional_charge.sgst_amt.toFixed(2)}</td>`);
+row.append(col);
+col = $(`<td>${additional_charge.cgst_amt.toFixed(2)}</td>`);
+row.append(col);
+col = $(`<td>${additional_charge.total_amt.toFixed(2)}</td>`);
+row.append(col);
+additional_charges_tbody.append(row);
+i++;
+}
+
+}
+else {
+row = $('<tr>');
+cell = $('<td colSpan="6" align="center"><b>NO ADDITIONAL CHANGES FOUND</b></td>');
+row.append(cell);
+additional_charges_tbody.append(row);
+}
+//display additional charges end
+
+$('#invoice_taxable_amt').html(`Rs ${model.invoiceDetail.taxable_amt.toFixed(2)}`);
+$('#invoice_igst_amt').html(`Rs ${model.invoiceDetail.igst_amt.toFixed(2)}`);
+$('#invoice_cgst_amt').html(`Rs ${model.invoiceDetail.cgst_amt.toFixed(2)}`);
+$('#invoice_sgst_amt').html(`Rs ${model.invoiceDetail.sgst_amt.toFixed(2)}`);
+$('#invoice_total_amt').html(`Rs ${model.invoiceDetail.total_amt.toFixed(2)}`);
+
+
+}
+
+// update view end
+
+const openFullInvoice = (tableRow) => {
+
+$('#invoiceBox').dialog({
+
+"close": function() {
+model.invoiceDetail = null;
+},
+minHeight: "auto",
+minWidth: "auto",
+modal: true
+});
+
+$('.ui-dialog').css({
+'width': '100%',
+'height': '100%',
+'left': '0px',
+'top':'0px'
+});
+
+const invoice_number = tableRow.parentElement.parentElement.id;
+const invoice = model.invoices.find(invoice => invoice.code == invoice_number);
+
+if(invoice && invoice.invoiceDetail) {
+model.invoiceDetail = invoice.invoiceDetail;
+updateInvoiceView();
+}
+else {
+getInvoiceByCode(invoice_number).then(
+(data) => {
+invoice['invoiceDetail'] = data.data;
+model.invoiceDetail = data.data;
+updateInvoiceView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+}
+
+}
+
+$(() => {
+
+// date picker start
+var start = moment().subtract(29, 'days');
+var end = moment();
+
+function cb(start, end) {
+$('#reportrange span').html(start.format('MMMM D, YYYY') + ' - ' + end.format('MMMM D, YYYY'));
+const start_date = start.format('YYYY-MM-DD');
+const end_date = end.format('YYYY-MM-DD');
+
+getInvoices(start_date, end_date).then(
+(data) => {
+model.invoices = data.data;
+updateInvoiceReportView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+)
+}
+
+$('#reportrange').daterangepicker({
+startDate: start,
+endDate: end,
+ranges: {
+'Today': [moment(), moment()],
+'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+'This Month': [moment().startOf('month'), moment().endOf('month')],
+'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+}
+}, cb);
+
+cb(start, end);
+
+// date picker end
+
+$('#invoiceBox').hide();
+
+});
+
+</script>
+
+</head>
+
+<body class="nav-md">
+<div class="container body">
+<div class="main_container">
+<div class="col-md-3 left_col">
+<div class="left_col scroll-view">
+<div class="navbar nav_title" style="border: 0;">
+<a href="index.html" class="site_title"><i class="fa fa-paw"></i> <span>DAS!</span></a>
+</div>
+
+<div class="clearfix"></div>
+
+<!-- menu profile quick info -->
+<div class="profile clearfix">
+<div class="profile_pic">
+<img src="images/img.jpg" alt="..." class="img-circle profile_img">
+</div>
+<div class="profile_info">
+<span>Welcome,</span>
+<h2>John Doe</h2>
+</div>
+</div>
+<!-- /menu profile quick info -->
+
+<br />
+
+<!-- sidebar menu -->
+<div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
+<div class="menu_section">
+<ul class="nav side-menu">
+<li><a href='items.html'><i class="fa fa-list"></i> Items </span></a></li>
+<li><a href='customers.html'><i class="fa fa-users"></i> Customers </span></a></li>
+<li><a href='creditInvoiceAddForm.html'><i class="fa fa-file-o"></i> Create Invoice </span></a></li>
+<li><a href='report.html'><i class="fa fa-list-alt"></i> Report </span></a></li>
+<li><a href='receipts.html'><i class="fa fa-clipboard"></i> Receipts </span></a></li>
+<li><a href='outstandingReport.html'><i class="fa fa-balance-scale"></i> Balance Report </span></a></li>
+<li><a href='traderSettings.html'><i class="fa fa-cog"></i> Setting </span></a></li>
+</ul>
+</div>
+</div>
+<!-- /sidebar menu -->
+
+</div>
+</div>
+
+<!-- top navigation -->
+<div class="top_nav">
+<div class="nav_menu">
+<div class="nav toggle">
+<a id="menu_toggle"><i class="fa fa-bars"></i></a>
+</div>
+<nav class="nav navbar-nav">
+<ul class=" navbar-right">
+<li class="nav-item dropdown open" style="padding-left: 15px;">
+<a href="javascript:;" class="user-profile dropdown-toggle" aria-haspopup="true" id="navbarDropdown"
+data-toggle="dropdown" aria-expanded="false">
+<img src="images/img.jpg" alt="">John Doe
+</a>
+<div class="dropdown-menu dropdown-usermenu pull-right" aria-labelledby="navbarDropdown">
+<a class="dropdown-item" href="javascript:;"> Profile</a>
+<a class="dropdown-item" href="javascript:;">
+<span class="badge bg-red pull-right">50%</span>
+<span>Settings</span>
+</a>
+<a class="dropdown-item" href="javascript:;">Help</a>
+<a class="dropdown-item" href="login.html"><i class="fa fa-sign-out pull-right"></i> Log Out</a>
+</div>
+</li>
+
+<li role="presentation" class="nav-item dropdown open">
+<a href="javascript:;" class="dropdown-toggle info-number" id="navbarDropdown1" data-toggle="dropdown"
+aria-expanded="false">
+<i class="fa fa-envelope-o"></i>
+<span class="badge bg-green">6</span>
+</a>
+<ul class="dropdown-menu list-unstyled msg_list" role="menu" aria-labelledby="navbarDropdown1">
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<div class="text-center">
+<a class="dropdown-item">
+  <strong>See All Alerts</strong>
+  <i class="fa fa-angle-right"></i>
+</a>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+<!-- /top navigation -->
+
+<!-- page content -->
+<div class="right_col" role="main">
+<div class="">
+<div class="page-title">
+<!-- <div class="title_left">
+<h3>Users <small>Some examples to get you started</small></h3>
+</div>
+
+<div class="title_right">
+<div class="col-md-5 col-sm-5 col-xs-12 form-group pull-right top_search">
+<div class="input-group">
+<input type="text" class="form-control" placeholder="Search for...">
+<span class="input-group-btn">
+<button class="btn btn-secondary" type="button">Go!</button>
+</span>
+</div>
+</div>
+</div> -->
+</div>
+
+<div class="clearfix"></div>
+
+<div class="row">
+<div class="col-md-12 col-sm-12 ">
+<div class="x_title">
+<h2>Report</h2>
+<ul class="nav navbar-right panel_toolbox">
+<li>
+<div id="reportrange" style="background: #fff; cursor: pointer; padding: 5px 10px; border: 1px solid #ccc; width: 100%">
+<i class="fa fa-calendar"></i>&nbsp;
+<span></span> <i class="fa fa-caret-down"></i>
+</div>
+</li>
+</ul>
+<div class="clearfix"></div>
+</div>
+<div class="x_content">
+<div class="row">
+<div class="col-sm-12">
+<div class="card-box table-responsive">
+  <!-- id="datatable-keytable" -->
+<table id="invoices-table" class="table table-striped table-bordered" style="width:100%">
+<thead>
+<tr>
+<th>Invoice Number</th>
+<th>Created Date</th>
+<th>Customer</th>
+<th>Taxable Amount</th>
+<th>CGST Amount</th>
+<th>SGST Amount</th>
+<th>IGST Amount</th>
+<th>Total Amount</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+
+<div id='invoiceBox'>
+
+
+<div class="right_col" role="main">
+<div class="">
+
+
+<div class="row">
+<div class="col-md-12">
+<div class="x_panel">
+
+<div class="x_content">
+
+<section class="content invoice">
+<!-- title row -->
+<div class="row">
+<div class="  invoice-header">
+<h1>
+<i class="fa fa-globe"></i> Invoice.
+<small class="pull-right" id='invoice-date'></small>
+</h1>
+</div>
+<!-- /.col -->
+</div>
+<!-- info row -->
+<div class="row invoice-info">
+
+<div class="col-sm-4 invoice-col" id='invoice-col-heading'>
+
+</div>
+<!-- /.col -->
+</div>
+<!-- /.row -->
+
+<!-- Table row -->
+<div class="row">
+<div class="  table">
+<table class="table table-striped">
+<thead>
+<tr>
+<th>Item</th>
+<th>Price</th>
+<th>Qty</th>
+<th>Unit</th>
+<th>Taxable</th>
+<th>IGST</th>
+<th>SGST</th>
+<th>CGST</th>
+<th>SubTotal</th>
+</tr>
+</thead>
+<tbody id='invoice-item'>
+
+</tbody>
+<thead>
+<tr>
+<th colSpan="8" align="center" >Additional Charges</th>
+</tr>
+<tr>
+<th>Description</th>
+<th>Amount</th>
+<th>IGST</th>
+<th>SGST</th>
+<th>CGST</th>
+<th>SubTotal</th>
+</tr>
+</thead>
+<tbody id='invoice-additional-charges'>
+
+</tbody>
+
+</table>
+</div>
+<!-- /.col -->
+</div>
+<!-- /.row -->
+
+<div class="row">
+<!-- accepted payments column -->
+<div class="col-md-6">
+<div class="table-responsive">
+<table class="table">
+<tbody>
+<tr>
+<th style="width:50%">Taxable Amount</th>
+<td id='invoice_taxable_amt'>$250.30</td>
+</tr>
+<tr>
+<th>IGST Amount</th>
+<td id='invoice_igst_amt'></td>
+</tr>
+<tr>
+<th>CGST Amount</th>
+<td id='invoice_cgst_amt'></td>
+</tr>
+<tr>
+<th>SGST Amount</th>
+<td id='invoice_sgst_amt'></td>
+</tr>
+<tr>
+<th>Total Amount:</th>
+<td id='invoice_total_amt'></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- /.col -->
+</div>
+<!-- /.row -->
+
+<!-- this row will not appear when printing -->
+<div class="row no-print">
+<div class=" ">
+<button class="btn btn-default" onclick="window.print();"><i class="fa fa-print"></i> Print</button>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+</div>
+
+</div>
+<!-- page content -->
+
+<!-- footer content -->
+<footer>
+<div class="pull-right">
+Gentelella - Bootstrap Admin Template by <a href="https://colorlib.com">Colorlib</a>
+</div>
+<div class="clearfix"></div>
+</footer>
+<!-- /footer content -->
+</div>
+</div>
+
+</body>
+
+</html>

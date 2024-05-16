@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- Meta, title, CSS, favicons, etc. -->
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Debtors Accounting System</title>
+
+<!-- Bootstrap -->
+<link href="cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
+<link href="vendors/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- Font Awesome -->
+<link href="vendors/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+<!-- NProgress -->
+<link href="vendors/nprogress/nprogress.css" rel="stylesheet">
+<!-- iCheck -->
+<link href="vendors/iCheck/skins/flat/green.css" rel="stylesheet">
+<!-- Datatables -->
+
+<link href="vendors/datatables.net-bs/css/dataTables.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-buttons-bs/css/buttons.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-fixedheader-bs/css/fixedHeader.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-responsive-bs/css/responsive.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-scroller-bs/css/scroller.bootstrap.min.css" rel="stylesheet">
+
+<!-- Custom Theme Style -->
+<link href="build/css/custom.min.css" rel="stylesheet">
+
+<!-- JQUERY -->
+<link rel='stylesheet' href='js/jquery-ui-1.13.2/jquery-ui.css'>
+<script src='js/jquery/jquery-3.7.1.min.js'></script>
+<script src='js/jquery-ui-1.13.2/jquery-ui.js'></script>
+<script src='js/jquery-validation-1.19.5/jquery.validate.min.js'></script>
+
+<!-- Toaster -->
+<link rel='stylesheet' href='js/toastr-master/build/toastr.min.css'>
+<script src='js/toastr-master/build/toastr.min.js'></script>
+
+<style>
+
+.selector-container {
+display: flex;
+padding: 25px;
+}
+
+.leftPane {
+width: 40%;
+}
+
+.middlePane {
+width: 20%;
+margin-left: 20px;
+margin-right: 20px;
+}
+
+.rightPane {
+width: 40%;
+}
+
+.list {
+border: 1px solid black;
+padding: 10px;
+}
+
+.list li {
+text-align: center;
+list-style: none;
+padding: 10px;
+cursor: pointer;
+}
+
+.list li:hover {
+background: #2a3f54;
+color: white;
+}
+
+.ui-selected {
+background: #2a3f54;
+color: white;
+}
+
+</style>
+
+<script>
+
+class ItemDataModel {
+
+constructor() {
+this.items = [];
+this.unitOfMeasurements = [];
+this.itemDetail = null;
+}
+
+getItems() {
+return this.items;
+}
+getUnitOfMeasurements() {
+return this.unitOfMeasurements;
+}
+getItemDetails() {
+return this.itemDetail;
+}
+
+}
+
+var model = new ItemDataModel();
+
+let left_list  = [];
+let right_list = [];
+let left_selecting_list = [];
+let right_selecting_list = [];
+
+function getItems() {
+
+return new Promise((resolve, reject) => {
+fetch('/getItems')
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch items list, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+function getUnitOfMeasurement() {
+
+return new Promise((resolve, reject) => {
+fetch('/getUnitOfMeasurements')
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch unit of measurement list, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+function getItemDetail(code) {
+
+return new Promise((resolve, reject) => {
+fetch('/getItemByCode?code='+code)
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch item details, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+function removeItem(code) {
+
+return new Promise((resolve, reject) => {
+fetch('/removeItem?code='+code)
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to remove item, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+function viewItemDetail(tableRow) {
+const itemCode = tableRow.id;
+const item = model.items.find(item => item.code == itemCode);
+if(item?.itemDetail) {
+model.itemDetail = item.itemDetail;
+updateItemDetailView();
+}
+else {
+getItemDetail(itemCode).then(
+(data) => {
+item.itemDetail = data.data;
+model.itemDetail = data.data;
+updateItemDetailView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+)
+}
+}
+
+const onDelete = () => {
+
+const index = model.items.findIndex(item => item.code == model.itemDetail.code);
+
+//delete api integration
+
+removeItem(model.itemDetail.code).then(
+(res) => {
+if(res.success) {
+toastr.success('Item removed', '', { 
+positionClass: 'toast-top-center'
+});
+model.items.splice(index, 1);
+updateItemView();
+$('#deleteItemBox').dialog('close');
+}
+else {
+toastr.error('Unable to remove item', '', { 
+positionClass: 'toast-top-center'
+});
+}
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+}
+
+function deleteItem(tableRow) {
+const itemCode = tableRow.parentElement.parentElement.id;
+const item = model.items.find(item => item.code == itemCode);
+
+$('#deleteItemBox').dialog({
+
+title: "Delete Item",
+buttons: [
+{
+"text": "Delete",
+"click": onDelete
+},
+{
+"text": "Cancel",
+"click": function() {
+$(this).dialog('close');
+}
+}
+],
+"close": function() {
+clearAddItemForm();
+},
+minHeight: 250,
+minWidth: 400,
+modal: true
+});
+
+if(item?.itemDetail) {
+model.itemDetail = item.itemDetail;
+updateDeletingItemDetailView();
+}
+else {
+getItemDetail(itemCode).then(
+(data) => {
+item.itemDetail = data.data;
+model.itemDetail = data.data;
+updateDeletingItemDetailView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+)
+}
+
+}
+
+function updateItemView() {
+var tbody = $('#items-table > tbody');
+tbody.html('');
+var row;
+var cell;
+if (model.items.length > 0) {
+var i = 0;
+var item;
+while (i < model.items.length) {
+item = model.items[i];
+row = $(`<tr onclick="viewItemDetail(this)" id=${item.code}>`);
+cell = $(`<td>${i + 1}</td>`);
+row.append(cell);
+cell = $(`<td>${item.code}</td>`);
+row.append(cell);
+cell = $(`<td>${item.name}</td>`);
+row.append(cell);
+cell = $(`<td>${item.hsn_code}</td>`);
+row.append(cell);
+cell = $('<div><i class="fa fa-pencil-square-o fa-2x"></i>&nbsp;&nbsp;<i  onclick="deleteItem(this)" class="fa fa-trash fa-2x"></i></div>');
+row.append(cell);
+tbody.append(row);
+i++;
+}
+}
+else {
+row = $('<tr>');
+cell = $('<td colSpan="5" align="center">NO ITEMS FOUND</td>');
+row.append(cell);
+tbody.append(row);
+}
+}
+
+function updateDeletingItemDetailView() {
+
+var deleteItemBox = $('#deleteItemBox');
+deleteItemBox.html('');
+var box;
+var content;
+if(model.itemDetail) {
+Object.keys(model.itemDetail).forEach((key) => {
+box = $('<div>');
+content = $(`<b style='text-transform: uppercase;'>${key}:</b>&nbsp;<span>${model.itemDetail[key]}</span>`)
+box.append(content);
+deleteItemBox.append(box);
+});
+
+}
+else {
+
+}
+
+}
+
+function updateItemDetailView() {
+
+var tbody = $('#item-detail > tbody');
+tbody.html('');
+var row;
+var col;
+if(model.itemDetail) {
+Object.keys(model.itemDetail).forEach((key) => {
+row = $('<tr>');
+col = $(`<th style='text-transform: uppercase;'>${key}</th>`);
+row.append(col);
+col = $(`<td>${model.itemDetail[key]}</td>`);
+row.append(col);
+tbody.append(row);
+});
+
+}
+else {
+
+}
+
+}
+
+function updateLeftUOMListView() {
+
+let ul = $('#uom');
+ul.html("");
+let li;
+left_list.forEach(uom => {
+li = $(`<li id='${uom.code}'>${uom.name}</li>`);
+ul.append(li);
+})
+
+ul.selectable({
+stop: function(evt) {
+left_selecting_list = [];
+const selectedUOM = $(this).find('.ui-selected');
+selectedUOM.each((index, e) => {
+left_selecting_list.push({code: e.id, name: e.innerHTML});
+});
+}
+});
+
+}
+
+function updateRightUOMListView() {
+
+let ul = $('#selected_uom');
+ul.html("");
+let li;
+right_list.forEach(uom => {
+li = $(`<li id='${uom.code}'>${uom.name}</li>`);
+ul.append(li);
+})
+
+ul.selectable({
+stop: function(evt) {
+right_selecting_list = [];
+const selectedUOM = $(this).find('.ui-selected');
+selectedUOM.each((index, e) => {
+right_selecting_list.push({code: e.id, name: e.innerHTML});
+});
+}
+});
+
+}
+
+function addNewItem() {
+
+$('#addItemBox').dialog({
+
+title: "Add New Item",
+buttons: [
+{
+"text": "Add",
+"click": onSubmit
+},
+{
+"text": "Cancel",
+"click": function() {
+$(this).dialog('close');
+clearAddItemForm();
+}
+}
+],
+"close": function() {
+clearAddItemForm();
+},
+minHeight: 400,
+minWidth: 500,
+modal: true
+});
+
+left_list = [...model.unitOfMeasurements];
+updateLeftUOMListView(); 
+
+}
+
+function onSubmit() {
+
+//validation
+const validator = $('#itemAddForm').validate({
+"rules": {
+"name": {
+"required": true,
+"rangelength": [1,25]
+},
+"hsn_code": {
+"required": true,
+"number": true
+},
+"cgst": {
+"required": true,
+"number": true
+},
+"sgst": {
+"required": true,
+"number": true
+},
+"igst": {
+"required": true,
+"number": true
+}
+},
+"messages": {
+"name": {
+"required": "Name is required",
+"rangelength": "Cannot exceeds 25 characters"
+},
+"hsn_code": {
+"required": "HSN Code is required",
+"number": "Should be a numeric value"
+},
+"cgst": {
+"required": "CGST is required",
+"number": "Should be a numeric value"
+},
+"sgst": {
+"required": "SGST is required",
+"number": "Should be a numeric value"
+},
+"igst": {
+"required": "IGST is required",
+"number": "Should be a numeric value"
+}
+}
+});
+
+validator.form();
+if(validator.valid()) {
+if(right_list.length == 0) {
+document.getElementById('globalErrorSection').innerHTML = "Alteast 1 UOM is required";
+return;
+}
+
+var itemAddForm = new FormData(document.getElementById('itemAddForm'));
+var itemJson = Object.fromEntries(itemAddForm.entries());
+itemJson.unitOfMeasurements = right_list;
+
+var xhr = new XMLHttpRequest();
+xhr.onreadystatechange = () => {
+if(xhr.readyState == 4) {
+const response = JSON.parse(xhr.responseText);
+if(xhr.status == 200) {
+if(response.success) {
+const { name, code, hsn_code } = response.data;
+model.items.unshift({ "code": code, "name": name, "hsn_code": hsn_code });
+updateItemView();
+toastr.success('Item Added', '', { 
+positionClass: 'toast-top-center'
+});
+$('#addItemBox').dialog('close');
+}
+else {
+toastr.error(response.error, '', { 
+positionClass: 'toast-top-center'
+});
+}
+}
+}
+}
+xhr.open('POST', 'addItem', true);
+xhr.setRequestHeader('Content-type', 'application/json');
+xhr.send(JSON.stringify(itemJson));
+
+}
+}
+
+function addNewUOM() {
+
+jQuery.validator.addMethod('duplicate', (value, element) => {
+
+if(model.unitOfMeasurements.find(uom => uom.name.toLowerCase() == value.toLowerCase())) return false;
+
+return true;
+
+}, `Already exist`);
+
+var validator = $('#addNewUOMForm').validate({
+"rules": {
+"new_uom": {
+"required": true,
+"rangelength": [1,5],
+"duplicate": true
+}
+},
+"messages": {
+"new_uom": {
+"required": "Name is required",
+"rangelength": "Cannot exceeds 5 characters"
+}
+}
+});
+
+validator.form();
+if(validator.valid()) {
+const name = document.getElementById('new_uom').value.trim();
+
+var xhr = new XMLHttpRequest();
+xhr.onreadystatechange = () => {
+if(xhr.readyState == 4) {
+if(xhr.status == 200) {
+const response = JSON.parse(xhr.responseText);
+console.log(response);
+if(response.success == true) {
+model.unitOfMeasurements.push(response.data);
+left_list.push(response.data);
+updateLeftUOMListView(); 
+toastr.success('Unit of Measurement added', '', { 
+positionClass: 'toast-top-center'
+});
+document.getElementById('new_uom').value = '';
+}
+else {
+toastr.error(response.error, '', { 
+positionClass: 'toast-top-center'
+});
+}
+}
+}
+}
+xhr.open("POST", 'addUnitOfMeasurement', true);
+xhr.setRequestHeader("Content-type", "application/json");
+xhr.send(JSON.stringify({"code": 0, "name": name}));
+
+
+}
+}
+
+function moveToRight() {
+right_list = [...right_list, ...left_selecting_list];
+left_list = left_list.filter(l_uom => !right_list.find(r_uom => r_uom.code == l_uom.code && r_uom.name == l_uom.name));
+left_selecting_list = [];
+updateLeftUOMListView();
+updateRightUOMListView();
+document.getElementById('globalErrorSection').innerHTML = "";
+}
+
+function moveToLeft() {
+left_list = [...left_list, ...right_selecting_list];
+right_list = right_list.filter(r_uom => !left_list.find(l_uom => l_uom.code == r_uom.code && l_uom.name == r_uom.name));
+right_selecting_list = [];
+updateLeftUOMListView();
+updateRightUOMListView();
+}
+
+function clearAddItemForm() {
+document.getElementById("name").value = "";
+document.getElementById("hsn_code").value = "";
+document.getElementById("cgst").value = "";
+document.getElementById("sgst").value = "";
+document.getElementById("igst").value = "";
+document.getElementById("globalErrorSection").innerHTML = "";
+left_list = [];
+right_list = [];
+left_selecting_list = [];
+right_selecting_list = [];
+updateLeftUOMListView();
+updateRightUOMListView();
+}
+
+$(() => {
+
+getItems().then(
+(data) => {
+model.items = data.data;
+if(model.items.length > 0) {
+getItemDetail(model.items[0].code).then(
+(data) => {
+model.items[0].itemDetail = data.data;
+model.itemDetail = data.data;
+updateItemDetailView();
+},
+(err) => {
+toastr.error('err', '', { 
+positionClass: 'toast-top-center'
+});
+}
+)
+}
+getUnitOfMeasurement().then(
+(data) => {
+model.unitOfMeasurements = data.data || [];
+updateItemView();
+},
+(err) => {
+toastr.error('err', '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+},
+(err) => {
+toastr.error('err', '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+$('#addItemBox').hide();
+$('#deleteItemBox').hide();
+
+});
+
+</script>
+
+</head>
+
+<body class="nav-md">
+<div class="container body">
+<div class="main_container">
+<div class="col-md-3 left_col">
+<div class="left_col scroll-view">
+<div class="navbar nav_title" style="border: 0;">
+<a href="index.html" class="site_title"><i class="fa fa-paw"></i> <span>DAS!</span></a>
+</div>
+
+<div class="clearfix"></div>
+
+<!-- menu profile quick info -->
+<div class="profile clearfix">
+<div class="profile_pic">
+<img src="images/img.jpg" alt="..." class="img-circle profile_img">
+</div>
+<div class="profile_info">
+<span>Welcome,</span>
+<h2>John Doe</h2>
+</div>
+</div>
+<!-- /menu profile quick info -->
+
+<br />
+
+<!-- sidebar menu -->
+<div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
+<div class="menu_section">
+<ul class="nav side-menu">
+<li><a href='items.html'><i class="fa fa-list"></i> Items </span></a></li>
+<li><a href='customers.html'><i class="fa fa-users"></i> Customers </span></a></li>
+<li><a href='creditInvoiceAddForm.html'><i class="fa fa-file-o"></i> Create Invoice </span></a></li>
+<li><a href='report.html'><i class="fa fa-list-alt"></i> Report </span></a></li>
+<li><a href='receipts.html'><i class="fa fa-clipboard"></i> Receipts </span></a></li>
+<li><a href='outstandingReport.html'><i class="fa fa-balance-scale"></i> Balance Report </span></a></li>
+<li><a href='traderSettings.html'><i class="fa fa-cog"></i> Setting </span></a></li>
+</ul>
+</div>
+</div>
+<!-- /sidebar menu -->
+
+</div>
+</div>
+
+<!-- top navigation -->
+<div class="top_nav">
+<div class="nav_menu">
+<div class="nav toggle">
+<a id="menu_toggle"><i class="fa fa-bars"></i></a>
+</div>
+<nav class="nav navbar-nav">
+<ul class=" navbar-right">
+<li class="nav-item dropdown open" style="padding-left: 15px;">
+<a href="javascript:;" class="user-profile dropdown-toggle" aria-haspopup="true" id="navbarDropdown"
+data-toggle="dropdown" aria-expanded="false">
+<img src="images/img.jpg" alt="">John Doe
+</a>
+<div class="dropdown-menu dropdown-usermenu pull-right" aria-labelledby="navbarDropdown">
+<a class="dropdown-item" href="javascript:;"> Profile</a>
+<a class="dropdown-item" href="javascript:;">
+<span class="badge bg-red pull-right">50%</span>
+<span>Settings</span>
+</a>
+<a class="dropdown-item" href="javascript:;">Help</a>
+<a class="dropdown-item" href="login.html"><i class="fa fa-sign-out pull-right"></i> Log Out</a>
+</div>
+</li>
+
+<li role="presentation" class="nav-item dropdown open">
+<a href="javascript:;" class="dropdown-toggle info-number" id="navbarDropdown1" data-toggle="dropdown"
+aria-expanded="false">
+<i class="fa fa-envelope-o"></i>
+<span class="badge bg-green">6</span>
+</a>
+<ul class="dropdown-menu list-unstyled msg_list" role="menu" aria-labelledby="navbarDropdown1">
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<div class="text-center">
+<a class="dropdown-item">
+  <strong>See All Alerts</strong>
+  <i class="fa fa-angle-right"></i>
+</a>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+<!-- /top navigation -->
+
+<!-- page content -->
+<div class="right_col" role="main">
+<div class="">
+<div class="page-title">
+<!-- <div class="title_left">
+<h3>Users <small>Some examples to get you started</small></h3>
+</div>
+
+<div class="title_right">
+<div class="col-md-5 col-sm-5 col-xs-12 form-group pull-right top_search">
+<div class="input-group">
+<input type="text" class="form-control" placeholder="Search for...">
+<span class="input-group-btn">
+<button class="btn btn-secondary" type="button">Go!</button>
+</span>
+</div>
+</div>
+</div> -->
+</div>
+
+<div class="clearfix"></div>
+
+<div class="row">
+<div class="col-md-12 col-sm-12 ">
+<div class="x_title">
+<h2>ITEMS</h2>
+<ul class="nav navbar-right panel_toolbox">
+<li onclick="addNewItem()"><i class="fa fa-plus-circle fa-2x"></i></li>
+</ul>
+<div class="clearfix"></div>
+</div>
+<div class="x_content">
+<div class="row">
+<div class="col-sm-12">
+<div class="card-box table-responsive">
+  <!-- id="datatable-keytable" -->
+<table id="items-table" class="table table-striped table-bordered" style="width:100%">
+<thead>
+<tr>
+<th>S.NO</th>
+<th>Code</th>
+<th>Name</th>
+<th>HSN Code</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="col-md-12 col-sm-12 ">
+<div class="x_panel">
+<div class="x_title">
+<h2>ITEM DETAILS</h2>
+<div class="clearfix"></div>
+</div>
+<div class="x_content">
+<div class="row">
+<div class="col-sm-12">
+<div class="card-box">
+<table id='item-detail' class="table" style="width:30%">
+<tbody></tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+<div id='addItemBox'>
+<form id='itemAddForm'>
+<div>
+<label for='name'>Name</label>
+<input type='text' id='name' name='name'>
+</div>
+<div>
+<label for='name'>HSN Code</label>
+<input type='text' id='hsn_code' name='hsn_code'>
+</div>
+<div>
+<label for='name'>CGST</label>
+<input type='text' id='cgst' name='cgst'>
+</div>
+<div>
+<label for='name'>SGST</label>
+<input type='text' id='sgst' name='sgst'>
+</div>
+<div>
+<label for='name'>IGST</label>
+<input type='text' id='igst' name='igst'>
+</div>
+</form>
+
+<div id='deleteItemBox'>
+
+</div>
+
+<div class='selector-container'>
+
+<div class='leftPane'>
+<ul class='list' id='uom'></ul>
+</div>
+
+<div class='middlePane'>
+<ul class='list'>
+<li id='right-arrow'>
+<button type='button' onclick='moveToRight()'><i class="fa fa-chevron-right"></i></button>
+</li>
+<li id='left-arrow'>
+<button type='button' onclick='moveToLeft()'><i class="fa fa-chevron-left"></i></button>
+</li>
+</ul>
+</div>
+
+<div class='rightPane'>
+<ul class='list' id='selected_uom'></ul>
+</div>
+
+</div>
+
+<div>
+<form id='addNewUOMForm'>
+<label for='new_uom'></label>
+<input type='text' id='new_uom' name='new_uom' />
+<br><br>
+<button type='button' onclick='addNewUOM()'>Add</button>
+</form>
+</div>
+
+<span id='globalErrorSection' style='color: red;'></span>
+
+</div>
+
+</div>
+<!-- /page content -->
+
+<!-- footer content -->
+<footer>
+<div class="pull-right">
+Gentelella - Bootstrap Admin Template by <a href="https://colorlib.com">Colorlib</a>
+</div>
+<div class="clearfix"></div>
+</footer>
+<!-- /footer content -->
+</div>
+</div>
+
+</body>
+
+</html>

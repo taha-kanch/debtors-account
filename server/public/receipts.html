@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- Meta, title, CSS, favicons, etc. -->
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Debtors Accounting System</title>
+
+<!-- Bootstrap -->
+<link href="cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
+<link href="vendors/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- Font Awesome -->
+<link href="vendors/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+<!-- NProgress -->
+<link href="vendors/nprogress/nprogress.css" rel="stylesheet">
+<!-- iCheck -->
+<link href="vendors/iCheck/skins/flat/green.css" rel="stylesheet">
+<!-- Datatables -->
+
+<link href="vendors/datatables.net-bs/css/dataTables.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-buttons-bs/css/buttons.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-fixedheader-bs/css/fixedHeader.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-responsive-bs/css/responsive.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-scroller-bs/css/scroller.bootstrap.min.css" rel="stylesheet">
+
+<!-- Custom Theme Style -->
+<link href="build/css/custom.min.css" rel="stylesheet">
+
+<!-- JQUERY -->
+<link rel='stylesheet' href='js/jquery-ui-1.13.2/jquery-ui.css'>
+<script src='js/jquery/jquery-3.7.1.min.js'></script>
+<script src='js/jquery-ui-1.13.2/jquery-ui.js'></script>
+<script src='js/jquery-validation-1.19.5/jquery.validate.min.js'></script>
+
+<!-- Toaster -->
+<link rel='stylesheet' href='js/toastr-master/build/toastr.min.css'>
+<script src='js/toastr-master/build/toastr.min.js'></script>
+
+<style>
+
+</style>
+
+<script>
+
+let isEdit = false;
+
+class ReceiptDataModel {
+
+constructor() {
+this.customers = [];
+this.receipts = [];
+this.receiptDetail = null;
+this.customer_remaining_balance_detail = null;
+}
+
+getCustomers() {
+return this.customers;
+}
+
+getReceipts() {
+return this.receipts;
+}
+
+getReceiptDetails() {
+return this.receiptDetail;
+}
+
+}
+
+var model = new ReceiptDataModel();
+
+function getReceipts(search='') {
+
+return new Promise((resolve, reject) => {
+fetch(`/getReceipts?search=${search}`)
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch receipts list, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+function getCustomers() {
+
+return new Promise((resolve, reject) => {
+fetch('/getCustomers')
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch customers list, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+function getReceiptByCode(code) {
+
+return new Promise((resolve, reject) => {
+fetch(`/getReceiptByCode?code=${code}`)
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch receipt detail, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+function getRemainingBalance(customer_code) {
+
+return new Promise((resolve, reject) => {
+fetch(`/getRemainingBalance?customer_code=${customer_code}`)
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch remaining balance, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+// update view start
+
+const updateCustomersOptionView = () => {
+let selectEle = $('#customer_code');
+selectEle.html('');
+let optionEle;
+optionEle = $(`<option value=''>--Select Customers--</option>`);
+selectEle.append(optionEle);
+if(model.customers.length > 0) {
+model.customers.forEach(customer => {
+optionEle = $(`<option value='${customer.code}'>${customer.name}</option>`);
+selectEle.append(optionEle);
+});
+}
+}
+
+const updateReceiptsView = () => {
+var tbody = $('#receipts-table > tbody');
+tbody.html('');
+var row;
+var cell;
+if (model.receipts.length > 0) {
+var i = 0;
+var receipt;
+while (i < model.receipts.length) {
+receipt = model.receipts[i];
+row = $(`<tr id=${receipt.code}>`);
+cell = $(`<td>${i + 1}</td>`);
+row.append(cell);
+cell = $(`<td>${receipt.code}</td>`);
+row.append(cell);
+cell = $(`<td>${receipt.customer_name}</td>`);
+row.append(cell);
+cell = $('<div onclick="viewReceipt(this)"><i class="fa fa-eye fa-2x"></i></div>');
+row.append(cell);
+tbody.append(row);
+i++;
+}
+}
+else {
+row = $('<tr>');
+cell = $('<td colSpan="5" align="center"><b>NO RECIEPTS FOUND</b></td>');
+row.append(cell);
+tbody.append(row);
+}
+}
+
+const updateReceiptDetailView = () => {
+
+var receiptViewBox = $('#receiptViewBox');
+receiptViewBox.html('');
+
+let ele;
+
+const date = new Date(model.receiptDetail.receipt_date);
+const day = date.getDate().toString().padStart(2, '0');
+const month = (date.getMonth() + 1).toString().padStart(2, '0');
+const year = date.getFullYear();
+const formattedDate = `${year}-${month}-${day}`;
+
+ele = $(`<b>Receipt Date: ${formattedDate}</b>`);
+receiptViewBox.append(ele);
+receiptViewBox.append(`<br><br>`);
+if(model.customer_remaining_balance_detail.balance < 0) {
+ele = $(`<b>Balance: ${-(model.customer_remaining_balance_detail.balance)} Cr</b>`);
+receiptViewBox.append(ele);
+}
+else {
+ele = $(`<b>Balance: ${model.customer_remaining_balance_detail.balance} Dr</b>`);
+receiptViewBox.append(ele);
+}
+
+receiptViewBox.append(`<br><br>`);
+ele = $(`<b>Amount Received: ${model.receiptDetail.amount}</b>`);
+receiptViewBox.append(ele);
+
+}
+
+// update view end
+
+const handleCustomerChange = (evt) => {
+$('#customer_code > option:eq(0)').prop('disabled', true);
+}
+
+const onAddNewReceipt = () => {
+
+//validation
+const validator = $('#receiptForm').validate({
+"rules": {
+"customer_code": {
+"required": true,
+"number": true
+},
+"amount": {
+"required": true,
+"number": true
+},
+"narration": {
+"rangelength": [1, 500]
+},
+},
+"messages": {
+"customer_code": {
+"required": "Please select customer",
+"number": "Should be a numeric value"
+},
+"amount": {
+"required": "Amount is required",
+"number": "Should be a numeric value"
+},
+"narration": {
+"rangelength": "Cannot exceeds 500 characters"
+}
+}
+});
+
+validator.form();
+if(validator.valid()) {
+
+var receiptForm = new FormData(document.getElementById('receiptForm'));
+var receiptJson = Object.fromEntries(receiptForm.entries());
+
+var xhr = new XMLHttpRequest();
+xhr.onreadystatechange = () => {
+if(xhr.readyState == 4) {
+const response = JSON.parse(xhr.responseText);
+if(xhr.status == 200) {
+if(response.success) {
+model.receipts.unshift(response.data);
+updateReceiptsView();
+toastr.success('Receipt Created', '', { 
+positionClass: 'toast-top-center'
+});
+$('#receiptFormBox').dialog('close');
+}
+else {
+toastr.error(response.error, '', { 
+positionClass: 'toast-top-center'
+});
+}
+}
+}
+}
+xhr.open('POST', 'addReceipt', true);
+xhr.setRequestHeader('Content-type', 'application/json');
+xhr.send(JSON.stringify(receiptJson));
+
+}
+
+}
+
+const addNewReceipt = () => {
+
+$('#receiptFormBox').dialog({
+
+title: "Add Receipt",
+buttons: [
+{
+"text": "Add",
+"click": onAddNewReceipt
+},
+{
+"text": "Cancel",
+"click": function() {
+$(this).dialog('close');
+clearAddReceiptForm();
+}
+}
+],
+"close": function() {
+clearAddReceiptForm();
+},
+minHeight: 300,
+minWidth: 400,
+modal: true
+});
+
+updateCustomersOptionView();
+
+}
+
+const viewReceipt = (tableRow) => {
+
+$('#receiptViewBox').dialog({
+
+title: "Receipt",
+"close": function() {
+model.customer_remaining_balance_detail = null;
+model.customer_remaining_balance_detail = null;
+},
+minHeight: 200,
+minWidth: 300,
+modal: true
+});
+
+const receipt_number = tableRow.parentElement.id;
+const receipt = model.receipts.find(r => r.code == receipt_number);
+if(receipt.receiptDetail && receipt.customer_remaining_balance_detail) {
+model.receiptDetail = receipt.receiptDetail;
+model.customer_remaining_balance_detail = receipt.customer_remaining_balance_detail;
+updateReceiptDetailView();
+}
+else {
+getReceiptByCode(receipt_number).then(
+(data) => {
+model.receiptDetail = data.data;
+receipt.receiptDetail = data.data;
+getRemainingBalance(data.data.customer_code).then(
+(data) => {
+model.customer_remaining_balance_detail = data.data;
+receipt.customer_remaining_balance_detail = data.data;
+updateReceiptDetailView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+}
+
+}
+
+const clearAddReceiptForm = () => {
+document.getElementById("customer_code").value = "";
+document.getElementById("amount").value = "";
+document.getElementById("narration").value = "";
+}
+
+
+const onSearch = (evt) => {
+const searchVal = evt.value;
+
+getReceipts(searchVal).then(
+(data) => {
+model.receipts = data.data;
+updateReceiptsView();
+},
+(err) => {
+toastr.error(err, '', {
+positionClass: 'toast-top-center'
+});
+}
+);
+
+}
+
+$(() => {
+
+getReceipts().then(
+(data) => {
+model.receipts = data.data;
+updateReceiptsView();
+getCustomers().then(
+(data) => {
+model.customers = data.data;
+},
+(err) => {
+toastr.error(err, '', {
+positionClass: 'toast-top-center'
+});
+}
+);
+
+},
+(err) => {
+toastr.error(err, '', {
+positionClass: 'toast-top-center'
+});
+}
+);
+
+$('#receiptFormBox').hide();
+$('#receiptViewBox').hide();
+
+});
+
+</script>
+
+</head>
+
+<body class="nav-md">
+<div class="container body">
+<div class="main_container">
+<div class="col-md-3 left_col">
+<div class="left_col scroll-view">
+<div class="navbar nav_title" style="border: 0;">
+<a href="index.html" class="site_title"><i class="fa fa-paw"></i> <span>DAS!</span></a>
+</div>
+
+<div class="clearfix"></div>
+
+<!-- menu profile quick info -->
+<div class="profile clearfix">
+<div class="profile_pic">
+<img src="images/img.jpg" alt="..." class="img-circle profile_img">
+</div>
+<div class="profile_info">
+<span>Welcome,</span>
+<h2>John Doe</h2>
+</div>
+</div>
+<!-- /menu profile quick info -->
+
+<br />
+
+<!-- sidebar menu -->
+<div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
+<div class="menu_section">
+<ul class="nav side-menu">
+<li><a href='items.html'><i class="fa fa-list"></i> Items </span></a></li>
+<li><a href='customers.html'><i class="fa fa-users"></i> Customers </span></a></li>
+<li><a href='creditInvoiceAddForm.html'><i class="fa fa-file-o"></i> Create Invoice </span></a></li>
+<li><a href='report.html'><i class="fa fa-list-alt"></i> Report </span></a></li>
+<li><a href='receipts.html'><i class="fa fa-clipboard"></i> Receipts </span></a></li>
+<li><a href='outstandingReport.html'><i class="fa fa-balance-scale"></i> Balance Report </span></a></li>
+<li><a href='traderSettings.html'><i class="fa fa-cog"></i> Setting </span></a></li>
+</ul>
+</div>
+</div>
+<!-- /sidebar menu -->
+
+</div>
+</div>
+
+<!-- top navigation -->
+<div class="top_nav">
+<div class="nav_menu">
+<div class="nav toggle">
+<a id="menu_toggle"><i class="fa fa-bars"></i></a>
+</div>
+<nav class="nav navbar-nav">
+<ul class=" navbar-right">
+<li class="nav-item dropdown open" style="padding-left: 15px;">
+<a href="javascript:;" class="user-profile dropdown-toggle" aria-haspopup="true" id="navbarDropdown"
+data-toggle="dropdown" aria-expanded="false">
+<img src="images/img.jpg" alt="">John Doe
+</a>
+<div class="dropdown-menu dropdown-usermenu pull-right" aria-labelledby="navbarDropdown">
+<a class="dropdown-item" href="javascript:;"> Profile</a>
+<a class="dropdown-item" href="javascript:;">
+<span class="badge bg-red pull-right">50%</span>
+<span>Settings</span>
+</a>
+<a class="dropdown-item" href="javascript:;">Help</a>
+<a class="dropdown-item" href="login.html"><i class="fa fa-sign-out pull-right"></i> Log Out</a>
+</div>
+</li>
+
+<li role="presentation" class="nav-item dropdown open">
+<a href="javascript:;" class="dropdown-toggle info-number" id="navbarDropdown1" data-toggle="dropdown"
+aria-expanded="false">
+<i class="fa fa-envelope-o"></i>
+<span class="badge bg-green">6</span>
+</a>
+<ul class="dropdown-menu list-unstyled msg_list" role="menu" aria-labelledby="navbarDropdown1">
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<div class="text-center">
+<a class="dropdown-item">
+  <strong>See All Alerts</strong>
+  <i class="fa fa-angle-right"></i>
+</a>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+<!-- /top navigation -->
+
+<!-- page content -->
+<div class="right_col" role="main">
+<div class="">
+<div class="page-title">
+
+<div class="title_left">
+<h3>RECEIPTS</h3>
+</div>
+
+<div class="title_right">
+<div class="col-md-5 col-sm-5 col-xs-12 form-group pull-right top_search">
+<input type="text" class="form-control" style="border-radius: 25px" onInput="onSearch(this)" placeholder="Search receipts...">
+</div>
+</div>
+
+</div>
+
+<div class="clearfix"></div>
+
+<div class="row">
+<div class="col-md-12 col-sm-12 ">
+<div class="x_title">
+<ul class="nav navbar-right panel_toolbox">
+<li onclick="addNewReceipt()"><i class="fa fa-plus-circle fa-2x"></i></li>
+</ul>
+<div class="clearfix"></div>
+</div>
+<div class="x_content">
+<div class="row">
+<div class="col-sm-12">
+<div class="card-box table-responsive">
+  <!-- id="datatable-keytable" -->
+<table id="receipts-table" class="table table-striped table-bordered" style="width:100%">
+<thead>
+<tr>
+<th>S.NO</th>
+<th>Receipt Number</th>
+<th>Customer</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+
+<div id='receiptFormBox'>
+
+<form id='receiptForm'>
+
+<input type='hidden' value='' id='code' name='code' />
+
+<div>
+<label for='customer_code'>Select Customer</label>
+<select id='customer_code' name='customer_code' onChange='handleCustomerChange(this)'></select>
+</div>
+
+<div>
+<label for='amount'>Amount</label>
+<input type='text' value='' id='amount' name='amount' />
+</div>
+
+<div>
+<label for='narration'>Narration</label>
+<textarea row='4' col='8' value='' id='narration' name='narration'></textarea>
+</div>
+
+</form>
+
+</div>
+
+<div id='receiptViewBox'></div>
+
+</div>
+<!-- page content -->
+
+<!-- footer content -->
+<footer>
+<div class="pull-right">
+Gentelella - Bootstrap Admin Template by <a href="https://colorlib.com">Colorlib</a>
+</div>
+<div class="clearfix"></div>
+</footer>
+<!-- /footer content -->
+</div>
+</div>
+
+</body>
+
+</html>

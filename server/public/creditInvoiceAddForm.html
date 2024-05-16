@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- Meta, title, CSS, favicons, etc. -->
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Debtors Accounting System</title>
+
+<!-- Bootstrap -->
+<link href="cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
+<link href="vendors/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- Font Awesome -->
+<link href="vendors/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+<!-- NProgress -->
+<link href="vendors/nprogress/nprogress.css" rel="stylesheet">
+<!-- iCheck -->
+<link href="vendors/iCheck/skins/flat/green.css" rel="stylesheet">
+<!-- Datatables -->
+
+<link href="vendors/datatables.net-bs/css/dataTables.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-buttons-bs/css/buttons.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-fixedheader-bs/css/fixedHeader.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-responsive-bs/css/responsive.bootstrap.min.css" rel="stylesheet">
+<link href="vendors/datatables.net-scroller-bs/css/scroller.bootstrap.min.css" rel="stylesheet">
+
+<!-- Custom Theme Style -->
+<link href="build/css/custom.min.css" rel="stylesheet">
+
+<!-- JQUERY -->
+<link rel='stylesheet' href='js/jquery-ui-1.13.2/jquery-ui.css'>
+<script src='js/jquery/jquery-3.7.1.min.js'></script>
+<script src='js/jquery-ui-1.13.2/jquery-ui.js'></script>
+<script src='js/jquery-validation-1.19.5/jquery.validate.min.js'></script>
+
+<!-- Toaster -->
+<link rel='stylesheet' href='js/toastr-master/build/toastr.min.css'>
+<script src='js/toastr-master/build/toastr.min.js'></script>
+
+<style>
+
+</style>
+
+<script>
+
+class InvoiceModel  {
+
+constructor() {
+this.customers = [];
+this.items = [];
+this.trader = [];
+this.unitOfMeasurements = [];
+this.selectedCustomer = null;
+this.selectedItems = [];
+this.isInterState = false;
+this.items_total = 0;
+this.additionalCharges = [];
+this.numberOfAdditionalChargesRow = 0;
+this.total = 0;
+this.roundOff = 0;
+this.netTotal = 0;
+
+
+}
+
+} 
+
+var model = new InvoiceModel();
+
+function getCustomers() {
+
+return new Promise((resolve, reject) => {
+fetch('/getCustomers')
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch customers list, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+function getUnitOfMeasurementsByItemCode(itemCode) {
+
+return new Promise((resolve, reject) => {
+fetch(`/getUnitOfMeasurementsByItemCode?itemCode=${itemCode}`)
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch unit of measurements list for the select item, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+const getTrader = () => {
+
+return new Promise((resolve, reject) => {
+fetch('/getTrader')
+.then(res => {
+if(!res.ok) {
+throw Error('Unable to fetch trader, please try again.');
+}
+return res.json();
+})
+.then(trader => resolve(trader))
+.catch(err => reject(err.message));
+});
+
+}
+
+function getItems() {
+
+return new Promise((resolve, reject) => {
+fetch('/getItems')
+.then(res => {
+if (!res.ok) {
+throw Error('Unable to fetch items list, please try again');
+}
+return res.json();
+})
+.then(res => resolve(res))
+.catch(err => reject(err.message));
+})
+
+}
+
+//update view methods start
+
+const updateItemsOptionView = () => {
+let selectEle = $('#item_code');
+selectEle.html('');
+let optionEle;
+optionEle = $(`<option value=''>--Select Items--</option>`);
+selectEle.append(optionEle);
+if(model.items.length > 0) {
+model.items.forEach(item => {
+optionEle = $(`<option value='${item.code}'>${item.name}</option>`);
+selectEle.append(optionEle);
+});
+}
+}
+
+const updateUnitOfMeasurementsOptionView = () => {
+let selectEle = $('#uom_code');
+selectEle.html('');
+let optionEle;
+optionEle = $(`<option value=''>--Select Unit of Measurement--</option>`);
+selectEle.append(optionEle);
+if(model.unitOfMeasurements.length > 0) {
+model.unitOfMeasurements.forEach(uom => {
+optionEle = $(`<option value='${uom.code}'>${uom.name}</option>`);
+selectEle.append(optionEle);
+});
+}
+}
+
+const updateCustomersOptionView = () => {
+let selectEle = $('#customer');
+selectEle.html('');
+let optionEle;
+optionEle = $(`<option value=''>--Select Customers--</option>`);
+selectEle.append(optionEle);
+if(model.customers.length > 0) {
+model.customers.forEach(customer => {
+optionEle = $(`<option value='${customer.code}'>${customer.name}</option>`);
+selectEle.append(optionEle);
+});
+}
+}
+
+function updateSelectedItemsView() {
+var tbody = $('#selected-items-table > tbody#invoice-items-section');
+tbody.html('');
+var row;
+var cell;
+if (model.selectedItems.length > 0) {
+var i = 0;
+var item;
+
+while (i < model.selectedItems.length) {
+item = model.selectedItems[i];
+row = $(`<tr id=${item.item_code}>`);
+cell = $(`<td>${i + 1}</td>`);
+row.append(cell);
+cell = $(`<td>${item.name}</td>`);
+row.append(cell);
+cell = $(`<td>${parseFloat(item.price).toFixed(2)}</td>`);
+row.append(cell);
+cell = $(`<td>${item.qty}</td>`);
+row.append(cell);
+cell = $(`<td>${model.isInterState ? 'N/A' : item.sgst_amt.toFixed(2)+' ('+item.sgst+'%)'}</td>`);
+row.append(cell);
+cell = $(`<td>${model.isInterState ? 'N/A' : item.cgst_amt.toFixed(2)+' ('+item.cgst+'%)'}</td>`);
+row.append(cell);
+cell = $(`<td>${model.isInterState ? item.igst_amt.toFixed(2)+' ('+item.igst+'%)' : 'N/A'}</td>`);
+row.append(cell);
+cell = $(`<td>${item.total_amt.toFixed(2)}</td>`);
+row.append(cell);
+tbody.append(row);
+i++;
+}
+$('#save-invoice-btn').show();
+}
+else {
+row = $('<tr>');
+cell = $('<td colSpan="8" align="center"><b>NO ITEM ADDED</b></td>');
+row.append(cell);
+tbody.append(row);
+$('#save-invoice-btn').hide();
+
+}
+}
+
+const updateInvoiceBottomSectionView = () => {
+
+var tbody = $('#selected-items-table > tbody#invoice-bottom-section');
+tbody.html('');
+var row;
+var cell;
+if (model.selectedItems.length > 0) {
+
+row = $('<tr>');
+cell = $('<td colSpan="6" align="center"><b>Additional Charges</b></td>');
+row.append(cell);
+cell = $('<td colSpan="1"><b>Sub Total</b></td>');
+row.append(cell);
+cell = $(`<td><b>${model.items_total.toFixed(2)}</b></td>`);
+row.append(cell);
+tbody.append(row);
+
+row = $('<tr>');
+cell = $(`<th colSpan='2'>Description</th>`);
+row.append(cell);
+cell = $(`<th>Amount</th>`);
+row.append(cell);
+if(model.isInterState) {
+cell = $(`<th colSpan='2'>IGST</th>`);
+row.append(cell);
+}
+else {
+cell = $(`<th>SGST</th>`);
+row.append(cell);
+cell = $(`<th>CGST</th>`);
+row.append(cell);
+}
+tbody.append(row);
+
+if(model.numberOfAdditionalChargesRow > 0) {
+let i = 0
+while(i < model.numberOfAdditionalChargesRow) {
+let additionalInfo = model.additionalCharges[i];
+row = $(`<tr id=${i}>`);
+cell = $(`<td colSpan="2"><input type='text' id='description' name='description' value="${additionalInfo.description}" onchange="onAdditionalFieldChange(this, ${i}, 'description')"></td>`);
+row.append(cell);
+cell = $(`<td><input type='text' id='taxable_amt' name='taxable_amt' value="${additionalInfo.taxable_amt}" onchange="onAdditionalFieldChange(this, ${i}, 'taxable_amt')"></td>`);
+row.append(cell);
+if(model.isInterState) {
+cell = $(`<td colSpan="2"><input type='text' id='igst' name='igst' value="${additionalInfo.igst}" onchange="onAdditionalFieldChange(this, ${i}, 'igst')"></td>`);
+row.append(cell);
+}
+else {
+cell = $(`<td><input type='text' id='sgst' name='sgst' value="${additionalInfo.sgst}" onchange="onAdditionalFieldChange(this, ${i}, 'sgst')"></td>`);
+row.append(cell);
+cell = $(`<td><input type='text' id='cgst' name='cgst' value="${additionalInfo.cgst}" onchange="onAdditionalFieldChange(this, ${i}, 'cgst')"></td>`);
+row.append(cell);
+}
+cell = $(`<td align="center"><div onClick="deleteAdditionChargesFields(this)"><i class="fa fa-trash fa-2x"></i><div></td>`);
+row.append(cell);
+cell = $(`<td align="center" id="additional-subTotal-row-${i}"><b>${additionalInfo.total_amt.toFixed(2)}</b></td>`);
+row.append(cell);
+tbody.append(row);
+i++;
+}
+}
+
+row = $('<tr>');
+cell = $(`<td colSpan="6" align="center"><i class="fa fa-plus-circle fa-2x" onclick="addFields()"></i></td>`);
+row.append(cell);
+tbody.append(row);
+
+}
+
+}
+
+const updateInvoiceAmountSectionView = () => {
+
+var tbody = $('#selected-items-table > tbody#invoice-amount-section');
+tbody.html('');
+var row;
+var cell;
+
+if (model.selectedItems.length > 0) {
+
+if(model.roundOff != 0) {
+
+row = $('<tr>');
+cell = $(`<td colSpan="6" align="right"><b>TOTAL</b></td>`);
+row.append(cell);
+cell = $(`<td colSpan="2" align="center"><b>${model.total.toFixed(2)}</b></td>`);
+row.append(cell);
+tbody.append(row);
+
+row = $('<tr>');
+cell = $(`<td colSpan="6" align="right"><b>ROUND OFF</b></td>`);
+row.append(cell);
+cell = $(`<td colSpan="2" align="center"><b>${model.roundOff.toFixed(2)}</b></td>`);
+row.append(cell);
+tbody.append(row);
+}
+
+row = $('<tr>');
+cell = $(`<td colSpan="6" align="right"><b>NET TOTAL</b></td>`);
+row.append(cell);
+cell = $(`<td colSpan="2" align="center"><b>${model.netTotal.toFixed(2)}</b></td>`);
+row.append(cell);
+tbody.append(row);
+
+}
+}
+
+//update view methods end
+
+const clearAddItemForm = () => {
+document.getElementById("item_code").value = "";
+document.getElementById("price").value = "";
+document.getElementById("uom_code").value = "";
+document.getElementById("qty").value = "";
+}
+
+const clearInvoice = () => {
+model.selectedItems = [];
+model.items_total = 0;
+model.total = 0;
+model.roundOff = 0;
+model.netTotal = 0;
+model.numberOfAdditionalChargesRow = 0;
+model.additionalCharges = [];
+updateSelectedItemsView();
+updateInvoiceAmountSectionView();
+updateInvoiceBottomSectionView();
+}
+
+const onAdditionalFieldChange = (evt, idx, fieldName) => {
+let additionalInfo = model.additionalCharges[idx];
+
+additionalInfo[fieldName] = evt.value;
+
+if(model.isInterState) {
+additionalInfo['igst_amt'] = (parseFloat(additionalInfo.igst) / 100) * parseFloat(additionalInfo.taxable_amt);
+}
+else {
+additionalInfo['sgst_amt'] = (parseFloat(additionalInfo.sgst) / 100) * parseFloat(additionalInfo.taxable_amt);
+additionalInfo['cgst_amt'] = (parseFloat(additionalInfo.cgst) / 100) * parseFloat(additionalInfo.taxable_amt);
+}
+  
+additionalInfo['total_amt'] = parseFloat(additionalInfo.taxable_amt) + additionalInfo['cgst_amt'] + additionalInfo['sgst_amt'] + additionalInfo['igst_amt'] ;
+
+const subTotalCol = $(`td[id=additional-subTotal-row-${idx}]`);
+subTotalCol.html(`<b>${additionalInfo.total_amt.toFixed(2)}</b>`);
+calculateNetTotal();
+updateInvoiceAmountSectionView();
+}
+
+const calculateNetTotal = () => {
+
+let total = 0;
+const additionalChargesTotal = model.additionalCharges.reduce((accumulator, row) => accumulator + row.total_amt , 0);
+total = model.items_total + additionalChargesTotal;
+if((total - Math.round(total)) !== 0 ) {
+
+const roundOff = Math.round(total) - total;
+model.total = total;
+model.roundOff = roundOff;
+model.netTotal = Math.round(total);
+}
+else {
+model.netTotal = total;
+model.roundOff = 0;
+model.total = 0;
+}
+
+}
+
+const handleCustomerChange = (evt) => {
+
+$('#customer > option:eq(0)').prop('disabled', true);
+const customerDetail = model.customers.find(customer => customer.code == evt.value);
+model.selectedCustomer = customerDetail;
+model.isInterState = customerDetail.state_code != model.trader.state_code;
+clearInvoice();
+}
+
+const handleItemChange = (evt) => {
+$('#item_code > option:eq(0)').prop('disabled', true);
+const uomSelect = document.getElementById("uom_code");
+if(!evt.value) {
+uomSelect.disabled = true;
+model.unitOfMeasurements = [];
+updateUnitOfMeasurementsOptionView();
+return;
+}
+
+getUnitOfMeasurementsByItemCode(evt.value).then(
+(data) => {
+uomSelect.disabled = false;
+model.unitOfMeasurements = data.data;
+updateUnitOfMeasurementsOptionView();
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+}
+
+function onSubmit() {
+
+//validation
+const validator = $('#additemForm').validate({
+"rules": {
+"item_code": {
+"required": true,
+"number": true
+},
+"price": {
+"required": true,
+"number": true
+},
+"uom_code": {
+"required": true,
+"number": true
+},
+"qty": {
+"required": true,
+"number": true
+}
+},
+"messages": {
+"item_code": {
+"required": "Please select item",
+"number": "Should be a numeric value"
+},
+"price": {
+"required": "Price is required",
+"number": "Should be a numeric value"
+},
+"uom_code": {
+"required": "Please select unit of measurement",
+"number": "Should be a numeric value"
+},
+"qty": {
+"required": "Quantity is required",
+"number": "Should be a numeric value"
+},
+}
+});
+
+validator.form();
+if(validator.valid()) {
+
+var addItemForm = new FormData(document.getElementById('additemForm'));
+var itemJson = Object.fromEntries(addItemForm.entries());
+
+const { name, sgst, cgst, igst } = model.items.find(item => item.code == itemJson.item_code);
+
+let taxable_amt = itemJson.price * itemJson.qty;
+
+let igst_amt = 0, sgst_amt = 0, cgst_amt = 0;
+if(model.isInterState) {
+igst_amt = ((igst / 100) * itemJson.price) * itemJson.qty;
+}
+else {
+sgst_amt = ((sgst / 100) * itemJson.price) * itemJson.qty;
+cgst_amt = ((cgst / 100) * itemJson.price) * itemJson.qty;
+}
+  
+let total_amt = taxable_amt + cgst_amt + sgst_amt + igst_amt;
+
+model.selectedItems.push({...itemJson, taxable_amt, name, cgst, cgst_amt, sgst, sgst_amt, igst, igst_amt, total_amt });
+console.log(model.selectedItems);
+
+model.items_total += parseFloat(total_amt);
+
+calculateNetTotal();
+updateSelectedItemsView();
+updateInvoiceBottomSectionView();
+updateInvoiceAmountSectionView();
+
+toastr.success('Item Added', '', { 
+positionClass: 'toast-top-center'
+});
+$('#addItemFormBox').dialog('close');
+
+}
+}
+
+function addItemToInvoice() {
+
+if(!model.selectedCustomer) {
+toastr.warning('Please select customer', '', {
+positionClass: 'toast-top-center'
+});
+return;
+}
+
+$('#addItemFormBox').dialog({
+
+title: "Add Item to Invoice",
+buttons: [
+{
+"text": "Add",
+"click": onSubmit
+},
+{
+"text": "Cancel",
+"click": function() {
+$(this).dialog('close');
+clearAddItemForm();
+}
+}
+],
+"close": function() {
+clearAddItemForm();
+},
+minHeight: 300,
+minWidth: 400,
+modal: true
+});
+
+updateItemsOptionView();
+updateUnitOfMeasurementsOptionView();
+
+}
+
+const addFields = () => {
+model.numberOfAdditionalChargesRow += 1;
+model.additionalCharges.push({ description: '', taxable_amt: 0, sgst: 0, sgst_amt: 0, cgst: 0, cgst_amt: 0, igst: 0, igst_amt: 0, total_amt: 0 });
+updateInvoiceBottomSectionView();
+}
+
+const deleteAdditionChargesFields = (tableRow) => {
+const idx = tableRow.parentElement.parentElement.id;
+tableRow.parentElement.parentElement.remove();
+model.numberOfAdditionalChargesRow -= 1;
+model.additionalCharges.splice(idx, 1);
+calculateNetTotal();
+updateInvoiceBottomSectionView();
+updateInvoiceAmountSectionView();
+}
+
+const createInvoice = () => {
+
+let taxable_amt = 0;
+let igst_amt = 0;
+let sgst_amt = 0;
+let cgst_amt = 0;
+let round_off_amt = 0;
+let total_amt = 0;
+
+let i=0;
+let item;
+while(i < model.selectedItems.length) {
+item = model.selectedItems[i];
+taxable_amt += parseFloat(item.taxable_amt);
+if(model.isInterState) {
+igst_amt += parseFloat(item.igst_amt);
+}
+else {
+sgst_amt += parseFloat(item.sgst_amt);
+cgst_amt += parseFloat(item.cgst_amt);
+}
+i++;
+}
+
+i = 0
+let additional_charge;
+while(i < model.additionalCharges.length) {
+additional_charge = model.additionalCharges[i];
+taxable_amt += parseFloat(additional_charge.taxable_amt);
+if(model.isInterState) {
+igst_amt += parseFloat(additional_charge.igst_amt);
+}
+else {
+sgst_amt += parseFloat(additional_charge.sgst_amt);
+cgst_amt += parseFloat(additional_charge.cgst_amt);
+}
+i++;
+}
+total_amt = model.netTotal;
+
+let invoiceJSON = {
+customer_code: model.selectedCustomer.code,
+total_items: model.selectedItems.length,
+taxable_amt,
+igst_amt,
+sgst_amt,
+cgst_amt,
+total_amt,
+items: model.selectedItems,
+additional_charges: model.additionalCharges
+}
+
+console.log(invoiceJSON);
+var xhr = new XMLHttpRequest();
+xhr.onreadystatechange = () => {
+if(xhr.readyState == 4) {
+const response = JSON.parse(xhr.responseText);
+if(xhr.status == 200) {
+if(response.success) {
+clearInvoice();
+toastr.success('Invoice Created', '', { 
+positionClass: 'toast-top-center'
+});
+}
+else {
+toastr.error(response.error, '', { 
+positionClass: 'toast-top-center'
+});
+}
+}
+else {
+toastr.error('Something went wrong', '', { 
+positionClass: 'toast-top-center'
+});
+}
+}
+}
+
+xhr.open('POST', 'addInvoice', true);
+xhr.setRequestHeader('Content-type', 'application/json');
+xhr.send(JSON.stringify(invoiceJSON));
+
+}
+
+$(() => {
+
+getCustomers().then(
+(data) => {
+model.customers = data.data;
+updateCustomersOptionView();
+getItems().then(
+(data) => {
+model.items = data.data;
+
+getTrader().then(
+(data) => {
+model.trader = data.data;
+
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+},
+(err) => {
+toastr.error(err, '', { 
+positionClass: 'toast-top-center'
+});
+}
+);
+
+$('#addItemFormBox').hide();
+$('#save-invoice-btn').button();
+$('#save-invoice-btn').hide();
+updateSelectedItemsView();
+
+});
+
+</script>
+
+</head>
+
+<body class="nav-md">
+<div class="container body">
+<div class="main_container">
+<div class="col-md-3 left_col">
+<div class="left_col scroll-view">
+<div class="navbar nav_title" style="border: 0;">
+<a href="index.html" class="site_title"><i class="fa fa-paw"></i> <span>DAS!</span></a>
+</div>
+
+<div class="clearfix"></div>
+
+<!-- menu profile quick info -->
+<div class="profile clearfix">
+<div class="profile_pic">
+<img src="images/img.jpg" alt="..." class="img-circle profile_img">
+</div>
+<div class="profile_info">
+<span>Welcome,</span>
+<h2>John Doe</h2>
+</div>
+</div>
+<!-- /menu profile quick info -->
+
+<br />
+
+<!-- sidebar menu -->
+<div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
+<div class="menu_section">
+<ul class="nav side-menu">
+<li><a href='items.html'><i class="fa fa-list"></i> Items </span></a></li>
+<li><a href='customers.html'><i class="fa fa-users"></i> Customers </span></a></li>
+<li><a href='creditInvoiceAddForm.html'><i class="fa fa-file-o"></i> Create Invoice </span></a></li>
+<li><a href='report.html'><i class="fa fa-list-alt"></i> Report </span></a></li>
+<li><a href='receipts.html'><i class="fa fa-clipboard"></i> Receipts </span></a></li>
+<li><a href='outstandingReport.html'><i class="fa fa-balance-scale"></i> Balance Report </span></a></li>
+<li><a href='traderSettings.html'><i class="fa fa-cog"></i> Setting </span></a></li>
+</ul>
+</div>
+</div>
+<!-- /sidebar menu -->
+
+</div>
+</div>
+
+<!-- top navigation -->
+<div class="top_nav">
+<div class="nav_menu">
+<div class="nav toggle">
+<a id="menu_toggle"><i class="fa fa-bars"></i></a>
+</div>
+<nav class="nav navbar-nav">
+<ul class=" navbar-right">
+<li class="nav-item dropdown open" style="padding-left: 15px;">
+<a href="javascript:;" class="user-profile dropdown-toggle" aria-haspopup="true" id="navbarDropdown"
+data-toggle="dropdown" aria-expanded="false">
+<img src="images/img.jpg" alt="">John Doe
+</a>
+<div class="dropdown-menu dropdown-usermenu pull-right" aria-labelledby="navbarDropdown">
+<a class="dropdown-item" href="javascript:;"> Profile</a>
+<a class="dropdown-item" href="javascript:;">
+<span class="badge bg-red pull-right">50%</span>
+<span>Settings</span>
+</a>
+<a class="dropdown-item" href="javascript:;">Help</a>
+<a class="dropdown-item" href="login.html"><i class="fa fa-sign-out pull-right"></i> Log Out</a>
+</div>
+</li>
+
+<li role="presentation" class="nav-item dropdown open">
+<a href="javascript:;" class="dropdown-toggle info-number" id="navbarDropdown1" data-toggle="dropdown"
+aria-expanded="false">
+<i class="fa fa-envelope-o"></i>
+<span class="badge bg-green">6</span>
+</a>
+<ul class="dropdown-menu list-unstyled msg_list" role="menu" aria-labelledby="navbarDropdown1">
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<a class="dropdown-item">
+<span class="image"><img src="images/img.jpg" alt="Profile Image" /></span>
+<span>
+  <span>John Smith</span>
+  <span class="time">3 mins ago</span>
+</span>
+<span class="message">
+  Film festivals used to be do-or-die moments for movie makers. They were where...
+</span>
+</a>
+</li>
+<li class="nav-item">
+<div class="text-center">
+<a class="dropdown-item">
+  <strong>See All Alerts</strong>
+  <i class="fa fa-angle-right"></i>
+</a>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+<!-- /top navigation -->
+
+<!-- page content -->
+<div class="right_col" role="main">
+<div class="">
+<div class="page-title">
+<!-- <div class="title_left">
+<h3>Users <small>Some examples to get you started</small></h3>
+</div>
+
+<div class="title_right">
+<div class="col-md-5 col-sm-5 col-xs-12 form-group pull-right top_search">
+<div class="input-group">
+<input type="text" class="form-control" placeholder="Search for...">
+<span class="input-group-btn">
+<button class="btn btn-secondary" type="button">Go!</button>
+</span>
+</div>
+</div>
+</div> -->
+</div>
+
+<div class="clearfix"></div>
+
+<div class="row">
+<div class="col-md-12 col-sm-12 ">
+<h2>CREATE INVOICE</h2>
+</div>
+<div class="col-md-12 col-sm-12 ">
+<div class="x_title">
+
+<div>
+<label for='customer'>Select Customer</label>
+<select id='customer' name='customer' onChange='handleCustomerChange(this)'></select>
+</div>
+
+<ul class="nav navbar-right panel_toolbox">
+<li onclick="addItemToInvoice()"><i class="fa fa-plus-circle fa-2x"></i></li>
+</ul>
+<div class="clearfix"></div>
+</div>
+<div class="x_content">
+<div class="row">
+<div class="col-sm-12">
+<div class="card-box table-responsive">
+<table id="selected-items-table" class="table table-striped table-bordered" style="width:100%">
+<thead>
+<tr>
+<th>S.NO</th>
+<th>Item</th>
+<th>Price</th>
+<th>Quantity</th>
+<th>SGST</th>
+<th>CGST</th>
+<th>IGST</th>
+<th>Amount</th>
+</tr>
+</thead>
+<tbody id='invoice-items-section'>
+</tbody>
+<tbody id='invoice-bottom-section'>
+</tbody>
+<tbody id='invoice-amount-section'>
+</tbody>
+</table>
+
+<button id='save-invoice-btn' onclick='createInvoice()'>Save Invoice</button>
+
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+</div>
+</div>
+</div>
+</div>
+
+<div id='addItemFormBox'>
+
+<form id='additemForm'>
+
+<div>
+<label for='item_code'>Select Item</label>
+<select id='item_code' name='item_code' onChange='handleItemChange(this)'></select>
+</div>
+
+<div>
+<label for='price'>Price</label>
+<input type='text' value='' id='price' name='price' />
+</div>
+
+<div>
+<label for='uom_code'>Select UOM</label>
+<select id='uom_code' name='uom_code' disabled></select>
+</div>
+
+<div>
+<label for='qty'>Quantity</label>
+<input type='text' value='' id='qty' name='qty' />
+</div>
+
+</form>
+
+</div>
+
+</div>
+<!-- page content -->
+
+<!-- footer content -->
+<footer>
+<div class="pull-right">
+Gentelella - Bootstrap Admin Template by <a href="https://colorlib.com">Colorlib</a>
+</div>
+<div class="clearfix"></div>
+</footer>
+<!-- /footer content -->
+</div>
+</div>
+
+</body>
+
+</html>
